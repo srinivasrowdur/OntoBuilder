@@ -1,0 +1,51 @@
+# Rowdur Contracts Ontology
+
+This repository contains a starter OWL ontology for contract intelligence.
+
+- Core ontology: `contracts-basic-ontology.ttl`
+- Example data: `examples/sample-nda.ttl`
+- SHACL shapes: `shapes/contracts-core.shapes.ttl`
+- Visualizations: `visualizations/index.html`
+- Local ontology catalog: `catalog-v001.xml`
+
+## Namespace
+
+The ontology namespace is:
+
+```text
+https://rowdur.com/ontology/contracts#
+```
+
+The ontology IRI is:
+
+```text
+https://rowdur.com/ontology/contracts
+```
+
+## Publication Status
+
+Version `0.1.0-alpha` is a publication candidate, not a final legal taxonomy. The core ontology uses a Rowdur-owned namespace, includes version metadata, and keeps sample individuals outside the core ontology.
+
+The current license is conservative: all rights reserved until Rowdur selects a public or commercial license. Confirm the intended license before public redistribution.
+
+Date-like values use `xsd:dateTime` rather than `xsd:date` so OWL tooling can validate the ontology profile more reliably. Date-only examples are represented as midnight UTC.
+
+## Validate
+
+Run the local structural validation:
+
+```sh
+/Users/srinivas/anaconda3/bin/python scripts/validate_ontology.py
+```
+
+If ROBOT is installed, run an OWL profile check:
+
+```sh
+robot validate-profile --input contracts-basic-ontology.ttl --profile DL
+```
+
+Regenerate diagrams after ontology or example edits:
+
+```sh
+/Users/srinivas/anaconda3/bin/python scripts/generate_ontology_visuals.py
+```

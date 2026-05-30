@@ -1,0 +1,37 @@
+digraph n_core_property_map {
+  graph [
+    label="Core object properties",
+    labelloc="t",
+    fontsize="22",
+    rankdir="LR",
+    bgcolor="white",
+    pad="0.35",
+    nodesep="0.55",
+    ranksep="0.7"
+  ];
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#64748b", fontname="Helvetica", fontsize="11", margin="0.08,0.05"];
+  edge [color="#64748b", arrowsize="0.75", fontname="Helvetica", fontsize="9"];
+  n_Clause [label="Clause"];
+  n_Contract [label="Contract"];
+  n_ContractDocument [label="ContractDocument"];
+  n_ContractEvent [label="Contract event"];
+  n_ContractTerm [label="Contract term"];
+  n_Customer [label="Customer"];
+  n_LifecycleState [label="Lifecycle state"];
+  n_Obligation [label="Obligation"];
+  n_Party [label="Party"];
+  n_Right [label="Right"];
+  n_Supplier [label="Supplier"];
+  n_Contract -> n_Clause [label="has clause"];
+  n_Contract -> n_ContractDocument [label="has document"];
+  n_Contract -> n_ContractEvent [label="has event"];
+  n_Contract -> n_ContractTerm [label="has term"];
+  n_Contract -> n_Customer [label="has customer"];
+  n_Contract -> n_LifecycleState [label="has lifecycle state"];
+  n_Contract -> n_Obligation [label="has obligation"];
+  n_Contract -> n_Right [label="has right"];
+  n_Contract -> n_Supplier [label="has supplier"];
+  n_Obligation -> n_Party [label="owed by"];
+  n_Obligation -> n_Party [label="owed to"];
+  n_Right -> n_Party [label="exercisable by"];
+}

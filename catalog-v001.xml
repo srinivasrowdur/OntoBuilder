@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog prefer="public" xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+  <uri name="https://rowdur.com/ontology/contracts" uri="contracts-basic-ontology.ttl"/>
+  <uri name="https://rowdur.com/ontology/contracts/0.1.0" uri="contracts-basic-ontology.ttl"/>
+  <uri name="https://rowdur.com/ontology/contracts/examples/sample-nda" uri="examples/sample-nda.ttl"/>
+</catalog>

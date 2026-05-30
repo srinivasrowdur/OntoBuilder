@@ -1,0 +1,73 @@
+@prefix contract: <https://rowdur.com/ontology/contracts#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+contract:ContractShape
+    a sh:NodeShape ;
+    sh:targetClass contract:Contract ;
+    sh:property [
+        sh:path contract:contractIdentifier ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] ;
+    sh:property [
+        sh:path contract:hasParty ;
+        sh:class contract:Party ;
+        sh:minCount 1
+    ] ;
+    sh:property [
+        sh:path contract:hasClause ;
+        sh:class contract:Clause ;
+        sh:minCount 1
+    ] .
+
+contract:ContractDocumentShape
+    a sh:NodeShape ;
+    sh:targetClass contract:ContractDocument ;
+    sh:property [
+        sh:path contract:documentName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1
+    ] ;
+    sh:property [
+        sh:path contract:documentFormat ;
+        sh:datatype xsd:string
+    ] .
+
+contract:PartyShape
+    a sh:NodeShape ;
+    sh:targetClass contract:Party ;
+    sh:property [
+        sh:path contract:legalName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1
+    ] ;
+    sh:property [
+        sh:path contract:countryCode ;
+        sh:datatype xsd:string ;
+        sh:pattern "^[A-Z]{2}$"
+    ] .
+
+contract:PaymentShape
+    a sh:NodeShape ;
+    sh:targetClass contract:Payment ;
+    sh:property [
+        sh:path contract:paymentAmount ;
+        sh:datatype xsd:decimal
+    ] ;
+    sh:property [
+        sh:path contract:paymentCurrency ;
+        sh:datatype xsd:string ;
+        sh:pattern "^[A-Z]{3}$"
+    ] .
+
+contract:ExtractionConfidenceShape
+    a sh:NodeShape ;
+    sh:targetSubjectsOf contract:extractionConfidence ;
+    sh:property [
+        sh:path contract:extractionConfidence ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 1
+    ] .

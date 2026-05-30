@@ -1,0 +1,76 @@
+digraph n_sample_nda_graph {
+  graph [
+    label="Sample NDA relationship graph",
+    labelloc="t",
+    fontsize="22",
+    rankdir="LR",
+    bgcolor="white",
+    pad="0.35",
+    nodesep="0.55",
+    ranksep="0.7"
+  ];
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#64748b", fontname="Helvetica", fontsize="11", margin="0.08,0.05"];
+  edge [color="#64748b", arrowsize="0.75", fontname="Helvetica", fontsize="9"];
+  n_AcmeLtd [label="Acme Ltd"];
+  n_ActiveStateExample [label="Active"];
+  n_BetaLtd [label="Beta Ltd"];
+  n_EnglandAndWales [label="England and Wales"];
+  n_SampleConfidentialInformation [label="Sample confidential information"];
+  n_SampleConfidentialityClause [label="Sample confidentiality clause"];
+  n_SampleConfidentialityFinding [label="Sample confidentiality finding"];
+  n_SampleConfidentialityObligation [label="Sample confidentiality obligation"];
+  n_SampleConfidentialityRisk [label="Sample confidentiality risk"];
+  n_SampleEffectiveDateTerm [label="Sample effective date term"];
+  n_SampleExecutionEvent [label="Sample execution event"];
+  n_SampleGoverningLawClause [label="Sample governing law clause"];
+  n_SampleMaterialBreachCondition [label="Sample material breach condition"];
+  n_SampleNDA [label="Sample NDA"];
+  n_SampleNDADocument [label="Sample NDA document"];
+  n_SampleNDAFamily [label="Sample NDA family"];
+  n_SampleNoticeClause [label="Sample notice clause"];
+  n_SampleNoticeObligation [label="Sample notice obligation"];
+  n_SampleTerminationRemedy [label="Sample termination remedy"];
+  n_SampleTerminationRight [label="Sample termination right"];
+  n_SampleConfidentialityClause -> n_SampleConfidentialInformation [label="has confidential information"];
+  n_SampleConfidentialityClause -> n_SampleConfidentialityObligation [label="imposes obligation"];
+  n_SampleConfidentialityFinding -> n_SampleConfidentialityRisk [label="has risk"];
+  n_SampleConfidentialityObligation -> n_AcmeLtd [label="owed by"];
+  n_SampleConfidentialityObligation -> n_AcmeLtd [label="owed to"];
+  n_SampleConfidentialityObligation -> n_BetaLtd [label="owed by"];
+  n_SampleConfidentialityObligation -> n_BetaLtd [label="owed to"];
+  n_SampleConfidentialityObligation -> n_SampleConfidentialInformation [label="has confidential information"];
+  n_SampleExecutionEvent -> n_AcmeLtd [label="performed by"];
+  n_SampleExecutionEvent -> n_BetaLtd [label="performed by"];
+  n_SampleGoverningLawClause -> n_EnglandAndWales [label="governed by"];
+  n_SampleNDA -> n_AcmeLtd [label="has party"];
+  n_SampleNDA -> n_AcmeLtd [label="has signatory"];
+  n_SampleNDA -> n_AcmeLtd [label="has supplier"];
+  n_SampleNDA -> n_ActiveStateExample [label="has lifecycle state"];
+  n_SampleNDA -> n_BetaLtd [label="has customer"];
+  n_SampleNDA -> n_BetaLtd [label="has party"];
+  n_SampleNDA -> n_BetaLtd [label="has signatory"];
+  n_SampleNDA -> n_EnglandAndWales [label="governed by"];
+  n_SampleNDA -> n_SampleConfidentialityClause [label="has clause"];
+  n_SampleNDA -> n_SampleConfidentialityFinding [label="has review finding"];
+  n_SampleNDA -> n_SampleConfidentialityObligation [label="has obligation"];
+  n_SampleNDA -> n_SampleEffectiveDateTerm [label="has term"];
+  n_SampleNDA -> n_SampleExecutionEvent [label="has event"];
+  n_SampleNDA -> n_SampleGoverningLawClause [label="has clause"];
+  n_SampleNDA -> n_SampleMaterialBreachCondition [label="has condition"];
+  n_SampleNDA -> n_SampleNDADocument [label="has document"];
+  n_SampleNDA -> n_SampleNDAFamily [label="belongs to family"];
+  n_SampleNDA -> n_SampleNoticeClause [label="has clause"];
+  n_SampleNDA -> n_SampleNoticeObligation [label="has obligation"];
+  n_SampleNDA -> n_SampleTerminationRemedy [label="has remedy"];
+  n_SampleNDA -> n_SampleTerminationRight [label="has right"];
+  n_SampleNoticeClause -> n_SampleNoticeObligation [label="imposes obligation"];
+  n_SampleNoticeObligation -> n_AcmeLtd [label="owed by"];
+  n_SampleNoticeObligation -> n_AcmeLtd [label="owed to"];
+  n_SampleNoticeObligation -> n_BetaLtd [label="owed by"];
+  n_SampleNoticeObligation -> n_BetaLtd [label="owed to"];
+  n_SampleTerminationRemedy -> n_SampleMaterialBreachCondition [label="remediates"];
+  n_SampleTerminationRemedy -> n_SampleMaterialBreachCondition [label="triggered by"];
+  n_SampleTerminationRight -> n_AcmeLtd [label="exercisable by"];
+  n_SampleTerminationRight -> n_BetaLtd [label="exercisable by"];
+  n_SampleTerminationRight -> n_SampleMaterialBreachCondition [label="triggered by"];
+}

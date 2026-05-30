@@ -1,0 +1,2019 @@
+@prefix : <https://rowdur.com/ontology/contracts#> .
+@prefix contract: <https://rowdur.com/ontology/contracts#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://rowdur.com/ontology/contracts>
+    a owl:Ontology ;
+    rdfs:label "Contracts ontology" ;
+    dcterms:title "Contracts ontology" ;
+    dcterms:created "2026-05-29T00:00:00Z"^^xsd:dateTime ;
+    dcterms:modified "2026-05-30T00:00:00Z"^^xsd:dateTime ;
+    dcterms:creator "Rowdur" ;
+    dcterms:publisher "Rowdur" ;
+    dcterms:license <https://rowdur.com/licenses/contracts-ontology> ;
+    dcterms:rights "Copyright 2026 Rowdur. All rights reserved unless Rowdur publishes a separate license." ;
+    dcterms:description "A broad starter ontology for contract intelligence covering contract documents, parties, clauses, obligations, rights, terms, dates, payments, notices, remedies, lifecycle events, review findings, risks, approvals, and source metadata." ;
+    vann:preferredNamespacePrefix "contract" ;
+    vann:preferredNamespaceUri "https://rowdur.com/ontology/contracts#" ;
+    owl:versionIRI <https://rowdur.com/ontology/contracts/0.1.0> ;
+    owl:versionInfo "0.1.0-alpha" ;
+    :definition "An OWL ontology for representing contract concepts and extracted contract data in a machine-readable form." ;
+    :description "This ontology is intentionally broad. It provides modelling primitives for legal review, contract analytics, obligation tracking, clause extraction, and contract lifecycle management." ;
+    :usageNote "Treat this as a foundation rather than a final legal taxonomy. Extend or specialize the model for a jurisdiction, industry, playbook, or clause library before production use. Example individuals are maintained separately under examples/." .
+
+#################################################################
+# Annotation properties
+#################################################################
+
+:definition
+    a owl:AnnotationProperty ;
+    rdfs:label "definition" ;
+    :definition "A concise statement of the intended meaning of an ontology entity." ;
+    :description "Use this annotation on classes, properties, and individuals to make the model readable in Protégé and downstream documentation." .
+
+:description
+    a owl:AnnotationProperty ;
+    rdfs:label "description" ;
+    :definition "A longer human-readable explanation of an ontology entity." ;
+    :description "Use this when a definition alone is too terse for reviewers, knowledge engineers, or contract analysts." .
+
+:usageNote
+    a owl:AnnotationProperty ;
+    rdfs:label "usage note" ;
+    :definition "Guidance on how an ontology entity should be used." ;
+    :description "Use this to capture modelling conventions, edge cases, and review practices." .
+
+:extractionHint
+    a owl:AnnotationProperty ;
+    rdfs:label "extraction hint" ;
+    :definition "A note describing how an entity may be identified in contract text or metadata." ;
+    :description "Use this to help information extraction, annotation, and contract review workflows." .
+
+:example
+    a owl:AnnotationProperty ;
+    rdfs:label "example" ;
+    :definition "An illustrative example of an ontology entity or value." ;
+    :description "Use this for short examples that clarify expected usage." .
+
+:riskNote
+    a owl:AnnotationProperty ;
+    rdfs:label "risk note" ;
+    :definition "A note describing legal, operational, or commercial risk relevance." ;
+    :description "Use this when an entity is important for issue spotting or playbook review." .
+
+:sourceReference
+    a owl:AnnotationProperty ;
+    rdfs:label "source reference" ;
+    :definition "A reference to a source document, clause library, playbook, statute, or system field." ;
+    :description "Use this to trace ontology entities back to their origin or intended source." .
+
+skos:definition
+    a owl:AnnotationProperty .
+
+skos:prefLabel
+    a owl:AnnotationProperty .
+
+skos:altLabel
+    a owl:AnnotationProperty .
+
+skos:scopeNote
+    a owl:AnnotationProperty .
+
+skos:example
+    a owl:AnnotationProperty .
+
+dcterms:description
+    a owl:AnnotationProperty .
+
+dcterms:title
+    a owl:AnnotationProperty .
+
+dcterms:created
+    a owl:AnnotationProperty .
+
+dcterms:modified
+    a owl:AnnotationProperty .
+
+dcterms:creator
+    a owl:AnnotationProperty .
+
+dcterms:publisher
+    a owl:AnnotationProperty .
+
+dcterms:license
+    a owl:AnnotationProperty .
+
+dcterms:rights
+    a owl:AnnotationProperty .
+
+owl:versionInfo
+    a owl:AnnotationProperty .
+
+vann:preferredNamespacePrefix
+    a owl:AnnotationProperty .
+
+vann:preferredNamespaceUri
+    a owl:AnnotationProperty .
+
+#################################################################
+# Classes - contract and document structure
+#################################################################
+
+:Contract
+    a owl:Class ;
+    rdfs:label "Contract" ;
+    skos:altLabel "Agreement" ;
+    :definition "A legally relevant agreement or instrument that records rights, obligations, permissions, restrictions, terms, and remedies between parties." ;
+    :description "Use Contract for the legal relationship or instrument itself, whether represented by one document or several related documents." ;
+    :extractionHint "Common document titles include agreement, contract, order form, statement of work, amendment, addendum, terms, or schedule." ;
+    rdfs:subClassOf
+        [
+            a owl:Restriction ;
+            owl:onProperty :hasParty ;
+            owl:someValuesFrom :Party
+        ],
+        [
+            a owl:Restriction ;
+            owl:onProperty :hasClause ;
+            owl:someValuesFrom :Clause
+        ] .
+
+:ContractFamily
+    a owl:Class ;
+    rdfs:label "Contract family" ;
+    :definition "A grouping of related contracts and documents that belong to the same commercial or legal arrangement." ;
+    :description "Use this for master agreements with order forms, schedules, statements of work, amendments, and renewal documents." .
+
+:ContractDocument
+    a owl:Class ;
+    rdfs:label "Contract document" ;
+    :definition "A file, paper, electronic record, or other documentary manifestation of a contract or contract component." ;
+    :description "Use this to represent the source artifact, separate from the legal contract concept." .
+
+:MasterAgreement
+    a owl:Class ;
+    rdfs:label "Master agreement" ;
+    :definition "A contract that establishes framework terms for later orders, statements of work, schedules, or transactions." ;
+    :description "Use for MSAs, framework agreements, master services agreements, and similar umbrella instruments." ;
+    rdfs:subClassOf :Contract .
+
+:StatementOfWork
+    a owl:Class ;
+    rdfs:label "Statement of work" ;
+    skos:altLabel "SOW" ;
+    :definition "A contract instrument that describes specific services, deliverables, timelines, fees, or responsibilities under a broader arrangement." ;
+    :description "Use when work scope creates or evidences binding contract terms separately from master legal terms." ;
+    rdfs:subClassOf :Contract .
+
+:OrderForm
+    a owl:Class ;
+    rdfs:label "Order form" ;
+    :definition "A contract instrument that records ordered products, services, quantities, pricing, subscriptions, or commercial selections." ;
+    :description "Use for orders that create binding commercial terms or incorporate master or online terms." ;
+    rdfs:subClassOf :Contract .
+
+:PurchaseOrder
+    a owl:Class ;
+    rdfs:label "Purchase order" ;
+    skos:altLabel "PO" ;
+    :definition "A buyer-issued contract instrument requesting or authorizing purchase of goods or services." ;
+    :description "Use when the purchasing record itself creates, accepts, or evidences contract terms." ;
+    rdfs:subClassOf :Contract .
+
+:Amendment
+    a owl:Class ;
+    rdfs:label "Amendment" ;
+    :definition "A contract that modifies, supplements, or replaces terms of an existing contract." ;
+    :description "Use for formal amendment agreements and change orders." ;
+    rdfs:subClassOf :Contract .
+
+:Addendum
+    a owl:Class ;
+    rdfs:label "Addendum" ;
+    :definition "A supplemental contract instrument attached to or incorporated into another contract." ;
+    :description "Use for additional binding terms that supplement the base contract without necessarily amending prior language." ;
+    rdfs:subClassOf :Contract .
+
+:Schedule
+    a owl:Class ;
+    rdfs:label "Schedule" ;
+    :definition "A structured contract attachment that contains terms, pricing, service details, or operational information." ;
+    :description "Use for schedules appended to or incorporated by a contract." ;
+    rdfs:subClassOf :ContractDocument .
+
+:Exhibit
+    a owl:Class ;
+    rdfs:label "Exhibit" ;
+    :definition "An attachment to a contract that is referenced by the main agreement." ;
+    :description "Use for exhibits, appendices, annexes, attachments, and similar supporting documents." ;
+    rdfs:subClassOf :ContractDocument .
+
+:PolicyDocument
+    a owl:Class ;
+    rdfs:label "Policy document" ;
+    :definition "A policy, standard, or external document incorporated into or referenced by a contract." ;
+    :description "Use for security policies, acceptable use policies, privacy policies, service descriptions, and similar referenced terms." ;
+    rdfs:subClassOf :ContractDocument .
+
+#################################################################
+# Classes - contract types
+#################################################################
+
+:SalesContract
+    a owl:Class ;
+    rdfs:label "Sales contract" ;
+    :definition "A contract for the sale or purchase of goods, services, software, or other offerings." ;
+    :description "Use for customer sales arrangements and revenue contracts." ;
+    rdfs:subClassOf :Contract .
+
+:ServiceAgreement
+    a owl:Class ;
+    rdfs:label "Service agreement" ;
+    :definition "A contract under which a provider supplies services to a customer or client." ;
+    :description "Use for professional services, managed services, support, consulting, implementation, or outsourcing agreements." ;
+    rdfs:subClassOf :Contract .
+
+:NonDisclosureAgreement
+    a owl:Class ;
+    rdfs:label "Non-disclosure agreement" ;
+    skos:altLabel "NDA" ;
+    :definition "A contract that restricts use or disclosure of confidential information." ;
+    :description "Use for unilateral or mutual confidentiality agreements and confidentiality undertakings." ;
+    rdfs:subClassOf
+        :Contract,
+        [
+            a owl:Restriction ;
+            owl:onProperty :hasClause ;
+            owl:someValuesFrom :ConfidentialityClause
+        ],
+        [
+            a owl:Restriction ;
+            owl:onProperty :hasObligation ;
+            owl:someValuesFrom :ConfidentialityObligation
+        ] .
+
+:EmploymentContract
+    a owl:Class ;
+    rdfs:label "Employment contract" ;
+    :definition "A contract governing the employment relationship between an employer and an employee." ;
+    :description "Use for employment agreements, offer letters with binding terms, and executive service agreements." ;
+    rdfs:subClassOf :Contract .
+
+:LeaseAgreement
+    a owl:Class ;
+    rdfs:label "Lease agreement" ;
+    :definition "A contract granting use or possession of property for a term in exchange for rent or other consideration." ;
+    :description "Use for real estate, equipment, vehicle, or asset leases." ;
+    rdfs:subClassOf :Contract .
+
+:LicenseAgreement
+    a owl:Class ;
+    rdfs:label "License agreement" ;
+    :definition "A contract granting permission to use intellectual property, software, data, technology, or other licensed assets." ;
+    :description "Use for software licenses, IP licenses, data licenses, and content licenses." ;
+    rdfs:subClassOf :Contract .
+
+:SupplyAgreement
+    a owl:Class ;
+    rdfs:label "Supply agreement" ;
+    :definition "A contract governing supply of goods, materials, inventory, or components." ;
+    :description "Use for procurement, manufacturing supply, resale, and distribution supply contracts." ;
+    rdfs:subClassOf :Contract .
+
+:DistributionAgreement
+    a owl:Class ;
+    rdfs:label "Distribution agreement" ;
+    :definition "A contract authorizing a distributor to market, sell, or distribute products or services." ;
+    :description "Use for reseller, channel, distributor, and indirect sales agreements." ;
+    rdfs:subClassOf :Contract .
+
+:PartnershipAgreement
+    a owl:Class ;
+    rdfs:label "Partnership agreement" ;
+    :definition "A contract establishing collaboration, partnership, alliance, or joint activity between parties." ;
+    :description "Use for strategic partnership, alliance, joint marketing, and collaboration agreements." ;
+    rdfs:subClassOf :Contract .
+
+:SettlementAgreement
+    a owl:Class ;
+    rdfs:label "Settlement agreement" ;
+    :definition "A contract resolving claims, disputes, liabilities, or threatened proceedings." ;
+    :description "Use for settlement and release agreements." ;
+    rdfs:subClassOf :Contract .
+
+#################################################################
+# Classes - components, clauses, terms, obligations, rights
+#################################################################
+
+:ContractComponent
+    a owl:Class ;
+    rdfs:label "Contract component" ;
+    :definition "A structural, semantic, or logical part of a contract." ;
+    :description "Use as a superclass for clauses, terms, obligations, rights, conditions, remedies, and deliverables." ;
+    owl:disjointWith :ContractEvent, :Party .
+
+:Clause
+    a owl:Class ;
+    rdfs:label "Clause" ;
+    :definition "A textual provision in a contract that states a rule, obligation, right, allocation of risk, or other legal effect." ;
+    :description "Use Clause for extractable provisions, whether numbered, headed, embedded in paragraphs, or split across sections." ;
+    :extractionHint "Look for clause numbers, headings, section titles, and defined term usage." ;
+    rdfs:subClassOf :ContractComponent .
+
+:PaymentClause
+    a owl:Class ;
+    rdfs:label "Payment clause" ;
+    :definition "A clause governing fees, invoices, payment timing, payment method, taxes, currency, or late payment." ;
+    :description "Use for financial performance terms." ;
+    rdfs:subClassOf :Clause .
+
+:ConfidentialityClause
+    a owl:Class ;
+    rdfs:label "Confidentiality clause" ;
+    :definition "A clause that restricts access, use, disclosure, handling, return, or destruction of confidential information." ;
+    :description "Use for confidentiality, non-use, non-disclosure, permitted disclosures, and information protection provisions." ;
+    rdfs:subClassOf :Clause .
+
+:TerminationClause
+    a owl:Class ;
+    rdfs:label "Termination clause" ;
+    :definition "A clause describing when or how a contract, right, obligation, order, or service may end." ;
+    :description "Use for termination for convenience, cause, breach, insolvency, change of control, and expiry mechanics." ;
+    rdfs:subClassOf :Clause .
+
+:LiabilityClause
+    a owl:Class ;
+    rdfs:label "Liability clause" ;
+    :definition "A clause allocating or limiting legal liability, damages, exclusions, caps, or indemnity exposure." ;
+    :description "Use for limitation of liability, exclusion of damages, carve-outs, indemnity, and liability allocation terms." ;
+    rdfs:subClassOf :Clause .
+
+:IndemnityClause
+    a owl:Class ;
+    rdfs:label "Indemnity clause" ;
+    :definition "A clause requiring one party to compensate, defend, or hold another party harmless for specified claims or losses." ;
+    :description "Use for third-party claims, IP infringement indemnity, data breach indemnity, tax indemnity, and general indemnities." ;
+    rdfs:subClassOf :LiabilityClause .
+
+:WarrantyClause
+    a owl:Class ;
+    rdfs:label "Warranty clause" ;
+    :definition "A clause containing promises about quality, performance, authority, compliance, title, non-infringement, or factual matters." ;
+    :description "Use for representations, warranties, warranty disclaimers, and warranty remedies." ;
+    rdfs:subClassOf :Clause .
+
+:GoverningLawClause
+    a owl:Class ;
+    rdfs:label "Governing law clause" ;
+    :definition "A clause identifying the law that governs interpretation or enforcement of the contract." ;
+    :description "Use for governing law, applicable law, choice of law, and conflicts provisions." ;
+    rdfs:subClassOf :Clause .
+
+:JurisdictionClause
+    a owl:Class ;
+    rdfs:label "Jurisdiction clause" ;
+    :definition "A clause identifying courts, tribunals, venues, or forums for disputes." ;
+    :description "Use for exclusive jurisdiction, non-exclusive jurisdiction, venue, forum selection, and service of process terms." ;
+    rdfs:subClassOf :Clause .
+
+:DisputeResolutionClause
+    a owl:Class ;
+    rdfs:label "Dispute resolution clause" ;
+    :definition "A clause governing dispute escalation, negotiation, mediation, arbitration, litigation, or expert determination." ;
+    :description "Use for multi-step dispute resolution provisions and arbitration terms." ;
+    rdfs:subClassOf :Clause .
+
+:NoticeClause
+    a owl:Class ;
+    rdfs:label "Notice clause" ;
+    :definition "A clause specifying how formal notices must be sent, addressed, delivered, or deemed received." ;
+    :description "Use for notice methods, contact addresses, deemed delivery rules, and copy requirements." ;
+    rdfs:subClassOf :Clause .
+
+:RenewalClause
+    a owl:Class ;
+    rdfs:label "Renewal clause" ;
+    :definition "A clause governing contract renewal, extension, auto-renewal, renewal notice, or non-renewal." ;
+    :description "Use for renewal mechanics and renewal deadlines." ;
+    rdfs:subClassOf :Clause .
+
+:AssignmentClause
+    a owl:Class ;
+    rdfs:label "Assignment clause" ;
+    :definition "A clause governing transfer, assignment, novation, subcontracting, change of control, or delegation." ;
+    :description "Use to model whether rights or obligations may be transferred and whether consent is required." ;
+    rdfs:subClassOf :Clause .
+
+:DataProtectionClause
+    a owl:Class ;
+    rdfs:label "Data protection clause" ;
+    :definition "A clause governing personal data, privacy, security measures, data processing, transfers, incidents, or regulatory compliance." ;
+    :description "Use for DPA clauses, GDPR terms, security obligations, breach notification, and processor obligations." ;
+    rdfs:subClassOf :Clause .
+
+:IntellectualPropertyClause
+    a owl:Class ;
+    rdfs:label "Intellectual property clause" ;
+    :definition "A clause governing ownership, licensing, assignment, use, infringement, or protection of intellectual property." ;
+    :description "Use for background IP, developed IP, feedback, licenses, open source, and infringement obligations." ;
+    rdfs:subClassOf :Clause .
+
+:ForceMajeureClause
+    a owl:Class ;
+    rdfs:label "Force majeure clause" ;
+    :definition "A clause excusing or modifying performance for events outside a party's reasonable control." ;
+    :description "Use for force majeure, relief events, delay events, and suspension of obligations." ;
+    rdfs:subClassOf :Clause .
+
+:ComplianceClause
+    a owl:Class ;
+    rdfs:label "Compliance clause" ;
+    :definition "A clause requiring compliance with laws, policies, standards, sanctions, anti-bribery rules, export controls, or other compliance obligations." ;
+    :description "Use for regulatory and policy compliance requirements." ;
+    rdfs:subClassOf :Clause .
+
+:InsuranceClause
+    a owl:Class ;
+    rdfs:label "Insurance clause" ;
+    :definition "A clause requiring a party to maintain insurance coverage, policy limits, certificates, or additional insured status." ;
+    :description "Use for insurance requirements and evidence of coverage." ;
+    rdfs:subClassOf :Clause .
+
+:AuditClause
+    a owl:Class ;
+    rdfs:label "Audit clause" ;
+    :definition "A clause granting inspection, audit, access, certification, or reporting rights." ;
+    :description "Use for customer audit rights, security audit rights, financial audits, and compliance checks." ;
+    rdfs:subClassOf :Clause .
+
+:ChangeControlClause
+    a owl:Class ;
+    rdfs:label "Change control clause" ;
+    :definition "A clause governing changes to scope, fees, timelines, deliverables, or contract terms." ;
+    :description "Use for change orders, variation procedures, and amendment mechanics." ;
+    rdfs:subClassOf :Clause .
+
+:Obligation
+    a owl:Class ;
+    rdfs:label "Obligation" ;
+    :definition "A duty imposed by a contract, clause, law, policy, or lifecycle event." ;
+    :description "Use for actionable commitments that can be owned, tracked, breached, waived, completed, or monitored." ;
+    rdfs:subClassOf
+        :ContractComponent,
+        [
+            a owl:Restriction ;
+            owl:onProperty :owedBy ;
+            owl:someValuesFrom :Party
+        ] .
+
+:PaymentObligation
+    a owl:Class ;
+    rdfs:label "Payment obligation" ;
+    :definition "An obligation to pay fees, charges, expenses, taxes, reimbursements, interest, damages, or other monetary amounts." ;
+    :description "Use for accounts payable and receivable obligations arising from contracts." ;
+    rdfs:subClassOf :Obligation .
+
+:DeliveryObligation
+    a owl:Class ;
+    rdfs:label "Delivery obligation" ;
+    :definition "An obligation to deliver goods, services, work product, documentation, access, data, or other deliverables." ;
+    :description "Use for operational performance commitments and implementation tracking." ;
+    rdfs:subClassOf :Obligation .
+
+:ConfidentialityObligation
+    a owl:Class ;
+    rdfs:label "Confidentiality obligation" ;
+    :definition "An obligation to protect, not disclose, not use, return, destroy, or restrict access to confidential information." ;
+    :description "Use for confidentiality duties under NDAs, MSAs, employment agreements, and policies." ;
+    rdfs:subClassOf :Obligation .
+
+:NoticeObligation
+    a owl:Class ;
+    rdfs:label "Notice obligation" ;
+    :definition "An obligation to send notice, provide information, escalate, report, or notify another party within required timing and form." ;
+    :description "Use for formal notice requirements and operational notification deadlines." ;
+    rdfs:subClassOf :Obligation .
+
+:ComplianceObligation
+    a owl:Class ;
+    rdfs:label "Compliance obligation" ;
+    :definition "An obligation to comply with legal, regulatory, policy, security, ethical, or industry requirements." ;
+    :description "Use for compliance tracking and audit readiness." ;
+    rdfs:subClassOf :Obligation .
+
+:SecurityObligation
+    a owl:Class ;
+    rdfs:label "Security obligation" ;
+    :definition "An obligation to maintain information security measures, controls, certifications, incident response, or access restrictions." ;
+    :description "Use for cybersecurity and security schedule commitments." ;
+    rdfs:subClassOf :ComplianceObligation .
+
+:IndemnityObligation
+    a owl:Class ;
+    rdfs:label "Indemnity obligation" ;
+    :definition "An obligation to indemnify, defend, or hold another party harmless for specified claims or losses." ;
+    :description "Use for claim handling and liability exposure analysis." ;
+    rdfs:subClassOf :Obligation .
+
+:AuditObligation
+    a owl:Class ;
+    rdfs:label "Audit obligation" ;
+    :definition "An obligation to permit, support, respond to, or remediate findings from an audit." ;
+    :description "Use for contractual audit support commitments." ;
+    rdfs:subClassOf :Obligation .
+
+:Right
+    a owl:Class ;
+    rdfs:label "Right" ;
+    :definition "A permission, power, entitlement, remedy, option, claim, or benefit granted under a contract." ;
+    :description "Use for rights that may be exercised, waived, transferred, limited, or conditioned." ;
+    owl:disjointWith :Obligation ;
+    rdfs:subClassOf
+        :ContractComponent,
+        [
+            a owl:Restriction ;
+            owl:onProperty :exercisableBy ;
+            owl:someValuesFrom :Party
+        ] .
+
+:TerminationRight
+    a owl:Class ;
+    rdfs:label "Termination right" ;
+    :definition "A right to end a contract, service, order, license, or obligation." ;
+    :description "Use for termination for convenience, termination for cause, suspension, expiry, or cancellation rights." ;
+    rdfs:subClassOf :Right .
+
+:RenewalRight
+    a owl:Class ;
+    rdfs:label "Renewal right" ;
+    :definition "A right or option to renew, extend, or continue a contract." ;
+    :description "Use for unilateral options, mutual renewal mechanisms, and automatic renewal rights." ;
+    rdfs:subClassOf :Right .
+
+:AuditRight
+    a owl:Class ;
+    rdfs:label "Audit right" ;
+    :definition "A right to inspect records, systems, premises, controls, reports, or compliance evidence." ;
+    :description "Use for commercial, security, compliance, and financial audit rights." ;
+    rdfs:subClassOf :Right .
+
+:SuspensionRight
+    a owl:Class ;
+    rdfs:label "Suspension right" ;
+    :definition "A right to pause performance, access, services, delivery, or payment under specified circumstances." ;
+    :description "Use for non-payment, security, compliance, or breach-based suspension rights." ;
+    rdfs:subClassOf :Right .
+
+:SetoffRight
+    a owl:Class ;
+    rdfs:label "Setoff right" ;
+    :definition "A right to offset one amount owed against another amount owed." ;
+    :description "Use for payment disputes and finance terms." ;
+    rdfs:subClassOf :Right .
+
+:ContractTerm
+    a owl:Class ;
+    rdfs:label "Contract term" ;
+    :definition "A parameter, duration, state, or condition that affects operation of a contract." ;
+    :description "Use for effective dates, expiry dates, renewal windows, notice periods, service levels, and other structured terms." ;
+    rdfs:subClassOf :ContractComponent .
+
+:EffectiveDateTerm
+    a owl:Class ;
+    rdfs:label "Effective date term" ;
+    :definition "A term identifying when a contract or provision becomes effective." ;
+    :description "Use for commencement, start, effective, activation, or go-live dates." ;
+    rdfs:subClassOf :ContractTerm .
+
+:ExpirationDateTerm
+    a owl:Class ;
+    rdfs:label "Expiration date term" ;
+    :definition "A term identifying when a contract, right, obligation, or period expires." ;
+    :description "Use for end dates, expiry dates, sunset dates, and term end dates." ;
+    rdfs:subClassOf :ContractTerm .
+
+:RenewalTerm
+    a owl:Class ;
+    rdfs:label "Renewal term" ;
+    :definition "A term governing renewal periods, renewal conditions, auto-renewal, or renewal notice." ;
+    :description "Use for evergreen, renewal option, extension, and non-renewal provisions." ;
+    rdfs:subClassOf :ContractTerm .
+
+:NoticePeriod
+    a owl:Class ;
+    rdfs:label "Notice period" ;
+    :definition "A time period required before a notice, termination, renewal, change, or action becomes effective." ;
+    :description "Use for notice periods expressed in days, months, business days, or calendar days." ;
+    rdfs:subClassOf :ContractTerm .
+
+:ServiceLevel
+    a owl:Class ;
+    rdfs:label "Service level" ;
+    skos:altLabel "SLA" ;
+    :definition "A measurable service commitment, performance metric, credit, uptime level, response time, or support requirement." ;
+    :description "Use for SLA terms and operational service commitments." ;
+    rdfs:subClassOf :ContractTerm .
+
+:Condition
+    a owl:Class ;
+    rdfs:label "Condition" ;
+    :definition "A factual or legal prerequisite, trigger, exception, or contingency affecting a contract right or obligation." ;
+    :description "Use for conditions precedent, conditions subsequent, cure periods, approval conditions, and exceptions." ;
+    rdfs:subClassOf :ContractComponent .
+
+:Remedy
+    a owl:Class ;
+    rdfs:label "Remedy" ;
+    :definition "A consequence, relief, cure, credit, damages measure, injunction, refund, indemnity, or other response to breach or non-performance." ;
+    :description "Use to connect breaches and issues to available contractual responses." ;
+    rdfs:subClassOf :ContractComponent .
+
+:Deliverable
+    a owl:Class ;
+    rdfs:label "Deliverable" ;
+    :definition "A work product, service output, document, product, milestone, or other item promised under a contract." ;
+    :description "Use for obligations that result in something being provided or completed." ;
+    rdfs:subClassOf :ContractComponent .
+
+#################################################################
+# Classes - parties and roles
+#################################################################
+
+:Party
+    a owl:Class ;
+    rdfs:label "Party" ;
+    :definition "A person, organization, government body, trust, partnership, or other entity that participates in or is affected by a contract." ;
+    :description "Use Party for signatories, customers, suppliers, affiliates, beneficiaries, guarantors, and other contract participants." .
+
+:LegalEntity
+    a owl:Class ;
+    rdfs:label "Legal entity" ;
+    :definition "An entity that can hold rights, incur obligations, sue, be sued, own property, or enter into contracts." ;
+    :description "Use for companies, individuals, government bodies, partnerships, and other legally recognized persons." ;
+    rdfs:subClassOf :Party .
+
+:Organization
+    a owl:Class ;
+    rdfs:label "Organization" ;
+    :definition "A company, corporation, public body, non-profit, partnership, association, or other organized legal entity." ;
+    :description "Use for non-natural persons that participate in contracts." ;
+    rdfs:subClassOf :LegalEntity .
+
+:Person
+    a owl:Class ;
+    rdfs:label "Person" ;
+    :definition "A natural person involved in a contract as an employee, contractor, signatory, representative, contact, or individual party." ;
+    :description "Use for individual parties and people acting for organizations." ;
+    rdfs:subClassOf :LegalEntity .
+
+:Affiliate
+    a owl:Class ;
+    rdfs:label "Affiliate" ;
+    :definition "An entity related to another entity through control, common control, ownership, group membership, or similar relationship." ;
+    :description "Use for affiliate coverage in rights, obligations, confidentiality, licenses, and indemnities." ;
+    rdfs:subClassOf :Party .
+
+:Representative
+    a owl:Class ;
+    rdfs:label "Representative" ;
+    :definition "A person or entity authorized to act for, receive notices for, negotiate for, or bind another party." ;
+    :description "Use for agents, officers, employees, attorneys, and other representatives." ;
+    rdfs:subClassOf :Party .
+
+:Signatory
+    a owl:Class ;
+    rdfs:label "Signatory" ;
+    :definition "A party or representative that signs or executes a contract." ;
+    :description "Use for signature blocks and execution metadata." ;
+    rdfs:subClassOf :Party .
+
+:Beneficiary
+    a owl:Class ;
+    rdfs:label "Beneficiary" ;
+    :definition "A person or organization that benefits from a contractual right, obligation, indemnity, or promise." ;
+    :description "Use for third-party beneficiaries, named beneficiaries, and protected affiliates." ;
+    rdfs:subClassOf :Party .
+
+:Customer
+    a owl:Class ;
+    rdfs:label "Customer" ;
+    :definition "A party receiving goods, services, software, data, or other value under a contract." ;
+    :description "Use for buyer, client, subscriber, licensee, or service recipient roles." ;
+    rdfs:subClassOf :Party .
+
+:Supplier
+    a owl:Class ;
+    rdfs:label "Supplier" ;
+    :definition "A party providing goods, services, software, data, or other value under a contract." ;
+    :description "Use for vendor, provider, licensor, contractor, consultant, seller, or service provider roles." ;
+    rdfs:subClassOf :Party .
+
+:Guarantor
+    a owl:Class ;
+    rdfs:label "Guarantor" ;
+    :definition "A party that guarantees another party's payment, performance, or obligations." ;
+    :description "Use for parent guarantees, performance guarantees, and financial guarantees." ;
+    rdfs:subClassOf :Party .
+
+:PartyRole
+    a owl:Class ;
+    rdfs:label "Party role" ;
+    :definition "A role played by a party in relation to a contract, clause, obligation, right, or event." ;
+    :description "Use when the same party may have different roles across contracts or provisions." .
+
+#################################################################
+# Classes - lifecycle, events, and status
+#################################################################
+
+:LifecycleState
+    a owl:Class ;
+    rdfs:label "Lifecycle state" ;
+    :definition "A state describing where a contract is in its lifecycle." ;
+    :description "Use for draft, under review, approved, executed, active, expired, terminated, superseded, or archived states." .
+
+:DraftState
+    a owl:Class ;
+    rdfs:label "Draft state" ;
+    :definition "A lifecycle state indicating the contract is being prepared and has not been finalized." ;
+    :description "Use before execution or final approval." ;
+    rdfs:subClassOf :LifecycleState .
+
+:NegotiationState
+    a owl:Class ;
+    rdfs:label "Negotiation state" ;
+    :definition "A lifecycle state indicating the parties are negotiating contract content." ;
+    :description "Use while redlines, comments, or issue lists are active." ;
+    rdfs:subClassOf :LifecycleState .
+
+:ApprovedState
+    a owl:Class ;
+    rdfs:label "Approved state" ;
+    :definition "A lifecycle state indicating required approvals have been obtained." ;
+    :description "Use before signature or release when approval workflow is complete." ;
+    rdfs:subClassOf :LifecycleState .
+
+:ExecutedState
+    a owl:Class ;
+    rdfs:label "Executed state" ;
+    :definition "A lifecycle state indicating the contract has been signed or otherwise legally executed." ;
+    :description "Use when execution evidence exists." ;
+    rdfs:subClassOf :LifecycleState .
+
+:ActiveState
+    a owl:Class ;
+    rdfs:label "Active state" ;
+    :definition "A lifecycle state indicating the contract is currently operative." ;
+    :description "Use when the contract is in force and has not expired or terminated." ;
+    rdfs:subClassOf :LifecycleState .
+
+:ExpiredState
+    a owl:Class ;
+    rdfs:label "Expired state" ;
+    :definition "A lifecycle state indicating the contract term has ended by passage of time." ;
+    :description "Use when an expiration date or term end has occurred." ;
+    rdfs:subClassOf :LifecycleState .
+
+:TerminatedState
+    a owl:Class ;
+    rdfs:label "Terminated state" ;
+    :definition "A lifecycle state indicating the contract has ended by termination." ;
+    :description "Use when termination occurs before or independent of ordinary expiry." ;
+    rdfs:subClassOf :LifecycleState .
+
+:ContractEvent
+    a owl:Class ;
+    rdfs:label "Contract event" ;
+    :definition "An event in the lifecycle or operation of a contract." ;
+    :description "Use for execution, amendment, renewal, expiry, termination, breach, dispute, notice, payment, and delivery events." .
+
+:ExecutionEvent
+    a owl:Class ;
+    rdfs:label "Execution event" ;
+    :definition "An event in which a contract is signed, accepted, or otherwise executed." ;
+    :description "Use for signature completion and execution dates." ;
+    rdfs:subClassOf :ContractEvent .
+
+:AmendmentEvent
+    a owl:Class ;
+    rdfs:label "Amendment event" ;
+    :definition "An event in which a contract is amended, varied, changed, or supplemented." ;
+    :description "Use for change order and amendment history." ;
+    rdfs:subClassOf :ContractEvent .
+
+:RenewalEvent
+    a owl:Class ;
+    rdfs:label "Renewal event" ;
+    :definition "An event in which a contract renews or is extended." ;
+    :description "Use for auto-renewals and express renewal actions." ;
+    rdfs:subClassOf :ContractEvent .
+
+:TerminationEvent
+    a owl:Class ;
+    rdfs:label "Termination event" ;
+    :definition "An event in which a contract or contract component terminates." ;
+    :description "Use for termination notices, termination effective dates, and termination reasons." ;
+    rdfs:subClassOf :ContractEvent .
+
+:BreachEvent
+    a owl:Class ;
+    rdfs:label "Breach event" ;
+    :definition "An event in which a party fails to perform or violates a contractual term." ;
+    :description "Use for defaults, material breaches, payment failures, confidentiality breaches, and SLA failures." ;
+    rdfs:subClassOf :ContractEvent .
+
+:NoticeEvent
+    a owl:Class ;
+    rdfs:label "Notice event" ;
+    :definition "An event in which a notice is sent, received, deemed delivered, or becomes effective." ;
+    :description "Use for formal notice workflow and notice deadline tracking." ;
+    rdfs:subClassOf :ContractEvent .
+
+:PaymentEvent
+    a owl:Class ;
+    rdfs:label "Payment event" ;
+    :definition "An event involving invoice issuance, payment due, payment receipt, late payment, credit, refund, or adjustment." ;
+    :description "Use for commercial tracking and payment obligations." ;
+    rdfs:subClassOf :ContractEvent .
+
+:DeliveryEvent
+    a owl:Class ;
+    rdfs:label "Delivery event" ;
+    :definition "An event involving delivery, acceptance, rejection, completion, or milestone achievement." ;
+    :description "Use for deliverable and performance tracking." ;
+    rdfs:subClassOf :ContractEvent .
+
+#################################################################
+# Classes - resources, money, law, data, and IP
+#################################################################
+
+:Resource
+    a owl:Class ;
+    rdfs:label "Resource" ;
+    :definition "A value, asset, item, information object, service, payment, or other thing referenced by a contract." ;
+    :description "Use as a superclass for payments, deliverables, confidential information, intellectual property, products, and services." .
+
+:Payment
+    a owl:Class ;
+    rdfs:label "Payment" ;
+    :definition "A monetary transfer, fee, charge, refund, credit, reimbursement, tax, interest amount, or other payment item." ;
+    :description "Use for structured monetary obligations and payment events." ;
+    rdfs:subClassOf :Resource .
+
+:Invoice
+    a owl:Class ;
+    rdfs:label "Invoice" ;
+    :definition "A billing document requesting payment for goods, services, fees, or other amounts." ;
+    :description "Use to connect payment obligations to invoice numbers, issue dates, and due dates." ;
+    rdfs:subClassOf :Resource .
+
+:Consideration
+    a owl:Class ;
+    rdfs:label "Consideration" ;
+    :definition "Value exchanged or promised under a contract." ;
+    :description "Use for money, services, promises, goods, rights, or other consideration." ;
+    rdfs:subClassOf :Resource .
+
+:Product
+    a owl:Class ;
+    rdfs:label "Product" ;
+    :definition "A good, item, software product, subscription, hardware, material, or other product supplied under a contract." ;
+    :description "Use for product-specific obligations and order terms." ;
+    rdfs:subClassOf :Resource .
+
+:Service
+    a owl:Class ;
+    rdfs:label "Service" ;
+    :definition "A service, support activity, consulting engagement, managed service, or other service supplied under a contract." ;
+    :description "Use for service scope and service level modelling." ;
+    rdfs:subClassOf :Resource .
+
+:ConfidentialInformation
+    a owl:Class ;
+    rdfs:label "Confidential information" ;
+    :definition "Information subject to confidentiality restrictions by contract, law, policy, or marking." ;
+    :description "Use for confidential data, trade secrets, technical information, business plans, pricing, source code, and personal data when treated confidentially." ;
+    rdfs:subClassOf :Resource .
+
+:PersonalData
+    a owl:Class ;
+    rdfs:label "Personal data" ;
+    :definition "Information relating to an identified or identifiable person." ;
+    :description "Use for privacy and data protection obligations, processing terms, and data transfer restrictions." ;
+    rdfs:subClassOf :ConfidentialInformation .
+
+:IntellectualProperty
+    a owl:Class ;
+    rdfs:label "Intellectual property" ;
+    skos:altLabel "IP" ;
+    :definition "Copyright, patent, trademark, trade secret, know-how, database right, moral right, design right, or other intangible rights." ;
+    :description "Use for ownership, license, assignment, infringement, and developed IP terms." ;
+    rdfs:subClassOf :Resource .
+
+:Currency
+    a owl:Class ;
+    rdfs:label "Currency" ;
+    :definition "A monetary currency used for pricing, payments, invoices, caps, thresholds, or damages." ;
+    :description "Use with ISO currency codes where possible." ;
+    rdfs:subClassOf :Resource .
+
+:Jurisdiction
+    a owl:Class ;
+    rdfs:label "Jurisdiction" ;
+    :definition "A legal territory, court system, venue, forum, arbitral seat, or governing law system relevant to a contract." ;
+    :description "Use for governing law, jurisdiction, forum, venue, and arbitral seat." .
+
+:LegalRule
+    a owl:Class ;
+    rdfs:label "Legal rule" ;
+    :definition "A statute, regulation, standard, policy, court rule, or legal requirement referenced by or applicable to a contract." ;
+    :description "Use for compliance and regulatory references." .
+
+:NoticeMethod
+    a owl:Class ;
+    rdfs:label "Notice method" ;
+    :definition "A permitted or required method for giving contractual notice." ;
+    :description "Use for email, courier, registered mail, portal notice, hand delivery, or other methods." .
+
+#################################################################
+# Classes - review, risk, approvals, and extraction
+#################################################################
+
+:ReviewFinding
+    a owl:Class ;
+    rdfs:label "Review finding" ;
+    :definition "A legal, commercial, operational, compliance, or data quality finding identified during contract review." ;
+    :description "Use for clause review issues, fallback positions, missing terms, non-standard language, and red flags." .
+
+:Risk
+    a owl:Class ;
+    rdfs:label "Risk" ;
+    :definition "A potential adverse legal, commercial, operational, compliance, financial, security, or data risk connected to a contract." ;
+    :description "Use for risk scoring, issue escalation, and playbook analysis." .
+
+:LegalRisk
+    a owl:Class ;
+    rdfs:label "Legal risk" ;
+    :definition "A risk involving legal enforceability, liability, remedies, claims, or dispute exposure." ;
+    :description "Use for legal review and negotiation issues." ;
+    rdfs:subClassOf :Risk .
+
+:CommercialRisk
+    a owl:Class ;
+    rdfs:label "Commercial risk" ;
+    :definition "A risk involving price, payment, revenue, cost, margin, renewal, volume, or commercial flexibility." ;
+    :description "Use for business and finance review." ;
+    rdfs:subClassOf :Risk .
+
+:OperationalRisk
+    a owl:Class ;
+    rdfs:label "Operational risk" ;
+    :definition "A risk involving performance, delivery, service levels, dependencies, staffing, process, or implementation." ;
+    :description "Use for operations and delivery review." ;
+    rdfs:subClassOf :Risk .
+
+:ComplianceRisk
+    a owl:Class ;
+    rdfs:label "Compliance risk" ;
+    :definition "A risk involving legal, regulatory, security, privacy, sanctions, anti-bribery, export, or policy compliance." ;
+    :description "Use for compliance review and controls." ;
+    rdfs:subClassOf :Risk .
+
+:Approval
+    a owl:Class ;
+    rdfs:label "Approval" ;
+    :definition "A decision, sign-off, authorization, exception approval, or workflow approval related to a contract." ;
+    :description "Use for legal, finance, procurement, business owner, security, privacy, and executive approvals." .
+
+:ReviewStatus
+    a owl:Class ;
+    rdfs:label "Review status" ;
+    :definition "A state indicating the progress or outcome of review." ;
+    :description "Use for not reviewed, in review, approved, rejected, escalated, accepted risk, or needs changes." .
+
+:ExtractionResult
+    a owl:Class ;
+    rdfs:label "Extraction result" ;
+    :definition "A structured output produced by a person, system, model, or rule that extracts information from a contract." ;
+    :description "Use to preserve provenance, confidence, source spans, and normalized values from contract intelligence pipelines." .
+
+:SourceSpan
+    a owl:Class ;
+    rdfs:label "Source span" ;
+    :definition "A text location, page region, byte offset, paragraph, or clause span from which information was extracted." ;
+    :description "Use for traceability from structured data back to source contract text." .
+
+#################################################################
+# Object properties
+#################################################################
+
+:belongsToFamily
+    a owl:ObjectProperty ;
+    rdfs:label "belongs to family" ;
+    :definition "Relates a contract or document to the contract family it belongs to." ;
+    :description "Use to group master agreements, order forms, statements of work, amendments, and attachments." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ContractFamily .
+
+:hasDocument
+    a owl:ObjectProperty ;
+    rdfs:label "has document" ;
+    :definition "Relates a contract to a source or supporting contract document." ;
+    :description "Use when multiple files or records represent the same legal arrangement." ;
+    rdfs:domain :Contract ;
+    rdfs:range :ContractDocument .
+
+:documentOf
+    a owl:ObjectProperty ;
+    rdfs:label "document of" ;
+    :definition "Relates a contract document to the contract it represents or supports." ;
+    :description "Inverse of has document." ;
+    owl:inverseOf :hasDocument ;
+    rdfs:domain :ContractDocument ;
+    rdfs:range :Contract .
+
+:hasLifecycleState
+    a owl:ObjectProperty ;
+    rdfs:label "has lifecycle state" ;
+    :definition "Relates a contract to its current lifecycle state." ;
+    :description "Use for CLM workflow and reporting." ;
+    rdfs:domain :Contract ;
+    rdfs:range :LifecycleState .
+
+:hasParty
+    a owl:ObjectProperty ;
+    rdfs:label "has party" ;
+    :definition "Relates a contract, clause, obligation, event, or right to a participating party." ;
+    :description "Use as a broad relationship; specialize with customer, supplier, signatory, beneficiary, or representative where known." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:hasCustomer
+    a owl:ObjectProperty ;
+    rdfs:label "has customer" ;
+    :definition "Relates a contract to the customer, buyer, client, subscriber, licensee, or recipient party." ;
+    :description "Subproperty of has party." ;
+    rdfs:subPropertyOf :hasParty ;
+    rdfs:domain :Contract ;
+    rdfs:range :Customer .
+
+:hasSupplier
+    a owl:ObjectProperty ;
+    rdfs:label "has supplier" ;
+    :definition "Relates a contract to the supplier, vendor, provider, licensor, contractor, or seller party." ;
+    :description "Subproperty of has party." ;
+    rdfs:subPropertyOf :hasParty ;
+    rdfs:domain :Contract ;
+    rdfs:range :Supplier .
+
+:hasSignatory
+    a owl:ObjectProperty ;
+    rdfs:label "has signatory" ;
+    :definition "Relates a contract to a party or person that signed or executed it." ;
+    :description "Use for signature blocks and signing authority." ;
+    rdfs:subPropertyOf :hasParty ;
+    rdfs:domain :Contract ;
+    rdfs:range :Signatory .
+
+:hasBeneficiary
+    a owl:ObjectProperty ;
+    rdfs:label "has beneficiary" ;
+    :definition "Relates a contract, clause, right, or obligation to a beneficiary." ;
+    :description "Use for third-party beneficiaries and protected affiliates." ;
+    rdfs:subPropertyOf :hasParty ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Beneficiary .
+
+:hasRepresentative
+    a owl:ObjectProperty ;
+    rdfs:label "has representative" ;
+    :definition "Relates a party or contract to a representative, agent, contact, or authorized person." ;
+    :description "Use for notices, execution, negotiation, and authority evidence." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Representative .
+
+:hasRole
+    a owl:ObjectProperty ;
+    rdfs:label "has role" ;
+    :definition "Relates a party to a role it plays in the context of a contract or component." ;
+    :description "Use when role assignments should be represented independently from class membership." ;
+    rdfs:domain :Party ;
+    rdfs:range :PartyRole .
+
+:hasComponent
+    a owl:ObjectProperty ;
+    rdfs:label "has component" ;
+    :definition "Relates a contract to a structural or semantic component." ;
+    :description "Broad property for clauses, obligations, rights, terms, conditions, remedies, and deliverables." ;
+    rdfs:domain :Contract ;
+    rdfs:range :ContractComponent .
+
+:hasClause
+    a owl:ObjectProperty ;
+    rdfs:label "has clause" ;
+    :definition "Relates a contract to a clause contained in, incorporated into, or extracted from it." ;
+    :description "Use for both explicit document clauses and normalized clause records." ;
+    rdfs:subPropertyOf :hasComponent ;
+    rdfs:domain :Contract ;
+    rdfs:range :Clause .
+
+:hasObligation
+    a owl:ObjectProperty ;
+    rdfs:label "has obligation" ;
+    :definition "Relates a contract to an obligation imposed by or associated with it." ;
+    :description "Use to link actionable duties to the contract." ;
+    rdfs:subPropertyOf :hasComponent ;
+    rdfs:domain :Contract ;
+    rdfs:range :Obligation .
+
+:imposesObligation
+    a owl:ObjectProperty ;
+    rdfs:label "imposes obligation" ;
+    :definition "Relates a clause, event, rule, or contract component to an obligation it creates or imposes." ;
+    :description "Use to trace obligations back to their legal source." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Obligation .
+
+:owedBy
+    a owl:ObjectProperty ;
+    rdfs:label "owed by" ;
+    :definition "Relates an obligation to the party responsible for performing it." ;
+    :description "Use for obligation ownership." ;
+    rdfs:domain :Obligation ;
+    rdfs:range :Party .
+
+:owedTo
+    a owl:ObjectProperty ;
+    rdfs:label "owed to" ;
+    :definition "Relates an obligation to the party that receives the benefit of performance." ;
+    :description "Use for beneficiary and counterparty tracking." ;
+    rdfs:domain :Obligation ;
+    rdfs:range :Party .
+
+:triggeredBy
+    a owl:ObjectProperty ;
+    rdfs:label "triggered by" ;
+    :definition "Relates an obligation, right, event, remedy, or condition to the event or condition that activates it." ;
+    :description "Use for breach triggers, renewal deadlines, notice requirements, and conditional rights." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range owl:Thing .
+
+:satisfiedBy
+    a owl:ObjectProperty ;
+    rdfs:label "satisfied by" ;
+    :definition "Relates an obligation, condition, or requirement to the action, event, evidence, or deliverable that satisfies it." ;
+    :description "Use for performance and compliance tracking." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range owl:Thing .
+
+:hasRight
+    a owl:ObjectProperty ;
+    rdfs:label "has right" ;
+    :definition "Relates a contract to a right arising under it." ;
+    :description "Use to list rights such as termination, renewal, audit, setoff, suspension, and remedies." ;
+    rdfs:subPropertyOf :hasComponent ;
+    rdfs:domain :Contract ;
+    rdfs:range :Right .
+
+:grantsRight
+    a owl:ObjectProperty ;
+    rdfs:label "grants right" ;
+    :definition "Relates a clause, contract, event, or rule to a right it grants." ;
+    :description "Use to trace rights to source provisions." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Right .
+
+:exercisableBy
+    a owl:ObjectProperty ;
+    rdfs:label "exercisable by" ;
+    :definition "Relates a right to the party that can exercise it." ;
+    :description "Use for option holders, beneficiaries, and party-specific rights." ;
+    rdfs:domain :Right ;
+    rdfs:range :Party .
+
+:hasTerm
+    a owl:ObjectProperty ;
+    rdfs:label "has term" ;
+    :definition "Relates a contract to a structured term." ;
+    :description "Use for dates, periods, notice requirements, renewal periods, and service levels." ;
+    rdfs:subPropertyOf :hasComponent ;
+    rdfs:domain :Contract ;
+    rdfs:range :ContractTerm .
+
+:hasCondition
+    a owl:ObjectProperty ;
+    rdfs:label "has condition" ;
+    :definition "Relates a contract component to a prerequisite, exception, contingency, or condition." ;
+    :description "Use to model conditions precedent, cure periods, exceptions, and approval requirements." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Condition .
+
+:hasDeliverable
+    a owl:ObjectProperty ;
+    rdfs:label "has deliverable" ;
+    :definition "Relates a contract, obligation, or statement of work to a deliverable." ;
+    :description "Use for work products, services, milestones, and outputs." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Deliverable .
+
+:hasService
+    a owl:ObjectProperty ;
+    rdfs:label "has service" ;
+    :definition "Relates a contract or deliverable to a service." ;
+    :description "Use for service scope and service schedules." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Service .
+
+:hasProduct
+    a owl:ObjectProperty ;
+    rdfs:label "has product" ;
+    :definition "Relates a contract or order to a product." ;
+    :description "Use for goods, subscriptions, software products, and equipment." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Product .
+
+:hasPayment
+    a owl:ObjectProperty ;
+    rdfs:label "has payment" ;
+    :definition "Relates a contract, invoice, obligation, event, or clause to a payment." ;
+    :description "Use for structured monetary amounts, fees, taxes, credits, and refunds." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Payment .
+
+:hasInvoice
+    a owl:ObjectProperty ;
+    rdfs:label "has invoice" ;
+    :definition "Relates a contract, payment, obligation, or event to an invoice." ;
+    :description "Use for billing and payment due tracking." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Invoice .
+
+:payableBy
+    a owl:ObjectProperty ;
+    rdfs:label "payable by" ;
+    :definition "Relates a payment to the party responsible for paying it." ;
+    :description "Use with payment obligations and invoices." ;
+    rdfs:domain :Payment ;
+    rdfs:range :Party .
+
+:payableTo
+    a owl:ObjectProperty ;
+    rdfs:label "payable to" ;
+    :definition "Relates a payment to the party entitled to receive it." ;
+    :description "Use with payment obligations and invoices." ;
+    rdfs:domain :Payment ;
+    rdfs:range :Party .
+
+:governedBy
+    a owl:ObjectProperty ;
+    rdfs:label "governed by" ;
+    :definition "Relates a contract or component to the governing jurisdiction or law." ;
+    :description "Use for governing law and applicable law relationships." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Jurisdiction .
+
+:hasJurisdiction
+    a owl:ObjectProperty ;
+    rdfs:label "has jurisdiction" ;
+    :definition "Relates a contract, clause, dispute, or event to a jurisdiction." ;
+    :description "Use for courts, venue, forum, arbitral seat, governing law, and regulatory territory." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Jurisdiction .
+
+:referencesLegalRule
+    a owl:ObjectProperty ;
+    rdfs:label "references legal rule" ;
+    :definition "Relates a contract component to a statute, regulation, standard, policy, or other legal rule it references." ;
+    :description "Use for compliance requirements and incorporated legal regimes." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :LegalRule .
+
+:hasEvent
+    a owl:ObjectProperty ;
+    rdfs:label "has event" ;
+    :definition "Relates a contract to a lifecycle or operational event." ;
+    :description "Use for execution, amendment, renewal, termination, breach, notice, payment, and delivery history." ;
+    rdfs:domain :Contract ;
+    rdfs:range :ContractEvent .
+
+:performedBy
+    a owl:ObjectProperty ;
+    rdfs:label "performed by" ;
+    :definition "Relates an event, obligation, or deliverable to the party that performed it." ;
+    :description "Use for performance records and evidence." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:receivedBy
+    a owl:ObjectProperty ;
+    rdfs:label "received by" ;
+    :definition "Relates an event, notice, payment, or deliverable to the receiving party." ;
+    :description "Use for notices, payments, deliveries, and communications." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:hasBreach
+    a owl:ObjectProperty ;
+    rdfs:label "has breach" ;
+    :definition "Relates a contract, obligation, party, or clause to a breach event." ;
+    :description "Use for default and breach tracking." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :BreachEvent .
+
+:hasRemedy
+    a owl:ObjectProperty ;
+    rdfs:label "has remedy" ;
+    :definition "Relates a contract, clause, breach, risk, or obligation to an available remedy." ;
+    :description "Use to model consequences and relief." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Remedy .
+
+:remediates
+    a owl:ObjectProperty ;
+    rdfs:label "remediates" ;
+    :definition "Relates a remedy to the breach, risk, issue, or non-performance it addresses." ;
+    :description "Use for issue and breach resolution mapping." ;
+    rdfs:domain :Remedy ;
+    rdfs:range owl:Thing .
+
+:hasNoticeMethod
+    a owl:ObjectProperty ;
+    rdfs:label "has notice method" ;
+    :definition "Relates a notice clause, notice obligation, or notice event to a permitted or required method." ;
+    :description "Use for email, postal mail, courier, portal, or hand delivery." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :NoticeMethod .
+
+:requiresNoticeTo
+    a owl:ObjectProperty ;
+    rdfs:label "requires notice to" ;
+    :definition "Relates a notice requirement to the party that must receive notice." ;
+    :description "Use for notice routing and deadline tracking." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:requiresNoticeFrom
+    a owl:ObjectProperty ;
+    rdfs:label "requires notice from" ;
+    :definition "Relates a notice requirement to the party that must send notice." ;
+    :description "Use for notice obligations and responsibility assignments." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:amends
+    a owl:ObjectProperty ;
+    rdfs:label "amends" ;
+    :definition "Relates an amendment to the contract or document it modifies." ;
+    :description "Use for amendment chains and change history." ;
+    rdfs:domain :Amendment ;
+    rdfs:range :Contract .
+
+:isAmendmentOf
+    a owl:ObjectProperty ;
+    rdfs:label "is amendment of" ;
+    :definition "Relates a contract to the contract it amends." ;
+    :description "Inverse-style relationship for amendment tracking." ;
+    rdfs:domain :Contract ;
+    rdfs:range :Contract .
+
+:supersedes
+    a owl:ObjectProperty ;
+    rdfs:label "supersedes" ;
+    :definition "Relates a contract, document, or clause to a prior item it replaces." ;
+    :description "Use for replacement agreements, restatements, and version history." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range owl:Thing .
+
+:incorporatesDocument
+    a owl:ObjectProperty ;
+    rdfs:label "incorporates document" ;
+    :definition "Relates a contract to a document incorporated by reference." ;
+    :description "Use for policies, schedules, online terms, and attachments incorporated into the contract." ;
+    rdfs:domain :Contract ;
+    rdfs:range :ContractDocument .
+
+:referencesDocument
+    a owl:ObjectProperty ;
+    rdfs:label "references document" ;
+    :definition "Relates an ontology entity to a document it references." ;
+    :description "Use for cross-document references and source traceability." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ContractDocument .
+
+:hasConfidentialInformation
+    a owl:ObjectProperty ;
+    rdfs:label "has confidential information" ;
+    :definition "Relates a contract, clause, obligation, event, or party to confidential information." ;
+    :description "Use to model protected information scope." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ConfidentialInformation .
+
+:licensesIntellectualProperty
+    a owl:ObjectProperty ;
+    rdfs:label "licenses intellectual property" ;
+    :definition "Relates a contract or clause to intellectual property being licensed." ;
+    :description "Use for software, data, content, trademark, patent, or technology license scopes." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :IntellectualProperty .
+
+:assignsIntellectualProperty
+    a owl:ObjectProperty ;
+    rdfs:label "assigns intellectual property" ;
+    :definition "Relates a contract or clause to intellectual property being assigned or transferred." ;
+    :description "Use for developed IP, work product, inventions, and assignment clauses." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :IntellectualProperty .
+
+:hasReviewFinding
+    a owl:ObjectProperty ;
+    rdfs:label "has review finding" ;
+    :definition "Relates a contract, clause, property, extraction result, or issue area to a review finding." ;
+    :description "Use for legal playbook outputs and human review annotations." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ReviewFinding .
+
+:hasRisk
+    a owl:ObjectProperty ;
+    rdfs:label "has risk" ;
+    :definition "Relates a contract, clause, obligation, finding, or party to a risk." ;
+    :description "Use for risk scoring and risk registers." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Risk .
+
+:mitigatesRisk
+    a owl:ObjectProperty ;
+    rdfs:label "mitigates risk" ;
+    :definition "Relates a clause, obligation, remedy, approval, or action to a risk it mitigates." ;
+    :description "Use for controls and fallback positions." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Risk .
+
+:hasApproval
+    a owl:ObjectProperty ;
+    rdfs:label "has approval" ;
+    :definition "Relates a contract, clause, finding, risk, or workflow item to an approval." ;
+    :description "Use for approvals and exception approvals." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Approval .
+
+:approvedBy
+    a owl:ObjectProperty ;
+    rdfs:label "approved by" ;
+    :definition "Relates an approval or approved item to the party or person granting approval." ;
+    :description "Use for approval provenance." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:reviewedBy
+    a owl:ObjectProperty ;
+    rdfs:label "reviewed by" ;
+    :definition "Relates a contract, clause, finding, extraction, or risk to the reviewer." ;
+    :description "Use for review provenance and accountability." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Party .
+
+:hasReviewStatus
+    a owl:ObjectProperty ;
+    rdfs:label "has review status" ;
+    :definition "Relates a contract, clause, finding, or extraction result to a review status." ;
+    :description "Use for workflow reporting." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ReviewStatus .
+
+:hasExtractionResult
+    a owl:ObjectProperty ;
+    rdfs:label "has extraction result" ;
+    :definition "Relates a contract, document, clause, or source span to an extraction result." ;
+    :description "Use to connect contract intelligence outputs to source material." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :ExtractionResult .
+
+:hasSourceSpan
+    a owl:ObjectProperty ;
+    rdfs:label "has source span" ;
+    :definition "Relates an extracted entity, finding, clause, or result to the source span supporting it." ;
+    :description "Use for evidence and traceability." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :SourceSpan .
+
+#################################################################
+# Data properties
+#################################################################
+
+:contractTitle
+    a owl:DatatypeProperty ;
+    rdfs:label "contract title" ;
+    :definition "The title or caption of a contract." ;
+    :description "Use the title as it appears in the document when available." ;
+    rdfs:domain :Contract ;
+    rdfs:range xsd:string .
+
+:contractIdentifier
+    a owl:DatatypeProperty ;
+    rdfs:label "contract identifier" ;
+    :definition "An internal or external identifier assigned to a contract." ;
+    :description "Use for CLM IDs, repository IDs, contract numbers, or other unique references." ;
+    rdfs:domain :Contract ;
+    rdfs:range xsd:string .
+
+:contractVersion
+    a owl:DatatypeProperty ;
+    rdfs:label "contract version" ;
+    :definition "A version label or version number for a contract or document." ;
+    :description "Use for draft versions, executed versions, restatements, and uploaded file versions." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:sourceSystem
+    a owl:DatatypeProperty ;
+    rdfs:label "source system" ;
+    :definition "The system from which a contract, document, extraction, or metadata record originated." ;
+    :description "Use for CLM, CRM, ERP, document repository, e-signature, or AI extraction source names." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:sourceUri
+    a owl:DatatypeProperty ;
+    rdfs:label "source URI" ;
+    :definition "A URI or URL pointing to a source document or system record." ;
+    :description "Use for file links, repository URLs, and system record URLs." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:anyURI .
+
+:repositoryPath
+    a owl:DatatypeProperty ;
+    rdfs:label "repository path" ;
+    :definition "A file path or repository location for a contract document." ;
+    :description "Use for local, shared drive, or document management locations." ;
+    rdfs:domain :ContractDocument ;
+    rdfs:range xsd:string .
+
+:documentName
+    a owl:DatatypeProperty ;
+    rdfs:label "document name" ;
+    :definition "The filename or display name of a contract document." ;
+    :description "Use for document-level records." ;
+    rdfs:domain :ContractDocument ;
+    rdfs:range xsd:string .
+
+:documentFormat
+    a owl:DatatypeProperty ;
+    rdfs:label "document format" ;
+    :definition "The format or MIME type of a contract document." ;
+    :description "Use values such as application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, or text/html." ;
+    rdfs:domain :ContractDocument ;
+    rdfs:range xsd:string .
+
+:effectiveDate
+    a owl:DatatypeProperty ;
+    rdfs:label "effective date" ;
+    :definition "The date on which a contract, clause, right, obligation, or term becomes effective." ;
+    :description "Use xsd:dateTime values when normalized." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:executionDate
+    a owl:DatatypeProperty ;
+    rdfs:label "execution date" ;
+    :definition "The date on which a contract was signed, accepted, or executed." ;
+    :description "Use where execution differs from effective date." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:expirationDate
+    a owl:DatatypeProperty ;
+    rdfs:label "expiration date" ;
+    :definition "The date on which a contract, right, obligation, or term expires." ;
+    :description "Use for contract end date and provision-specific expiry." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:renewalDate
+    a owl:DatatypeProperty ;
+    rdfs:label "renewal date" ;
+    :definition "A date on which a contract renews or may renew." ;
+    :description "Use for automatic renewal and option renewal dates." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:renewalNoticeDeadline
+    a owl:DatatypeProperty ;
+    rdfs:label "renewal notice deadline" ;
+    :definition "The deadline for giving notice of renewal or non-renewal." ;
+    :description "Use for renewal management and alerting." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:noticePeriodDays
+    a owl:DatatypeProperty ;
+    rdfs:label "notice period days" ;
+    :definition "The length of a notice period expressed in days." ;
+    :description "Use when notice period is normalized from text." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:integer .
+
+:termLengthMonths
+    a owl:DatatypeProperty ;
+    rdfs:label "term length months" ;
+    :definition "The duration of a contract term expressed in months." ;
+    :description "Use for normalized fixed terms and renewal terms." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:integer .
+
+:autoRenews
+    a owl:DatatypeProperty ;
+    rdfs:label "auto renews" ;
+    :definition "Indicates whether a contract or term automatically renews." ;
+    :description "Use true when auto-renewal is present, false when explicitly absent." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:boolean .
+
+:eventDate
+    a owl:DatatypeProperty ;
+    rdfs:label "event date" ;
+    :definition "The date on which a contract event occurred or is scheduled to occur." ;
+    :description "Use for execution, payment, notice, breach, renewal, and termination events." ;
+    rdfs:domain :ContractEvent ;
+    rdfs:range xsd:dateTime .
+
+:signatureDate
+    a owl:DatatypeProperty ;
+    rdfs:label "signature date" ;
+    :definition "The date a party or signatory signed a contract." ;
+    :description "Use for per-party signing evidence." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:partyName
+    a owl:DatatypeProperty ;
+    rdfs:label "party name" ;
+    :definition "The display name or contract name of a party." ;
+    :description "Use the name as it appears in the contract when possible." ;
+    rdfs:domain :Party ;
+    rdfs:range xsd:string .
+
+:legalName
+    a owl:DatatypeProperty ;
+    rdfs:label "legal name" ;
+    :definition "The formal legal name of a party." ;
+    :description "Use for normalized party master data." ;
+    rdfs:domain :Party ;
+    rdfs:range xsd:string .
+
+:registrationNumber
+    a owl:DatatypeProperty ;
+    rdfs:label "registration number" ;
+    :definition "A company number, registration number, or other official identifier for a party." ;
+    :description "Use with the relevant registry or jurisdiction where known." ;
+    rdfs:domain :Party ;
+    rdfs:range xsd:string .
+
+:taxIdentifier
+    a owl:DatatypeProperty ;
+    rdfs:label "tax identifier" ;
+    :definition "A tax ID, VAT number, EIN, GST number, or similar tax identifier for a party." ;
+    :description "Use when tax identifiers are relevant to contracting or invoicing." ;
+    rdfs:domain :Party ;
+    rdfs:range xsd:string .
+
+:emailAddress
+    a owl:DatatypeProperty ;
+    rdfs:label "email address" ;
+    :definition "An email address for a party, representative, notice recipient, or contact." ;
+    :description "Use for notice and contact data." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:postalAddress
+    a owl:DatatypeProperty ;
+    rdfs:label "postal address" ;
+    :definition "A postal or physical address for a party, representative, or notice recipient." ;
+    :description "Use for notice clauses, signature blocks, and party master data." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:countryCode
+    a owl:DatatypeProperty ;
+    rdfs:label "country code" ;
+    :definition "A country code associated with a party, jurisdiction, document, or address." ;
+    :description "Use ISO country codes where possible." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:jurisdictionName
+    a owl:DatatypeProperty ;
+    rdfs:label "jurisdiction name" ;
+    :definition "The human-readable name of a jurisdiction." ;
+    :description "Use for governing law, venue, and forum names." ;
+    rdfs:domain :Jurisdiction ;
+    rdfs:range xsd:string .
+
+:governingLawText
+    a owl:DatatypeProperty ;
+    rdfs:label "governing law text" ;
+    :definition "The source text that states governing law or applicable law." ;
+    :description "Use for raw clause text before or alongside normalized jurisdiction data." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:venueText
+    a owl:DatatypeProperty ;
+    rdfs:label "venue text" ;
+    :definition "The source text that identifies dispute forum, venue, courts, or arbitral seat." ;
+    :description "Use for jurisdiction and dispute resolution clauses." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:clauseNumber
+    a owl:DatatypeProperty ;
+    rdfs:label "clause number" ;
+    :definition "The section, article, clause, schedule, or paragraph number assigned to a clause." ;
+    :description "Use to preserve contract structure and references." ;
+    rdfs:domain :Clause ;
+    rdfs:range xsd:string .
+
+:clauseHeading
+    a owl:DatatypeProperty ;
+    rdfs:label "clause heading" ;
+    :definition "The heading or caption of a clause." ;
+    :description "Use heading text exactly as shown in the document where possible." ;
+    rdfs:domain :Clause ;
+    rdfs:range xsd:string .
+
+:clauseText
+    a owl:DatatypeProperty ;
+    rdfs:label "clause text" ;
+    :definition "The textual content of a clause." ;
+    :description "Use for the source provision text or a normalized extract when raw text is unavailable." ;
+    rdfs:domain :Clause ;
+    rdfs:range xsd:string .
+
+:obligationText
+    a owl:DatatypeProperty ;
+    rdfs:label "obligation text" ;
+    :definition "The text describing an obligation." ;
+    :description "Use for obligation extraction and task generation." ;
+    rdfs:domain :Obligation ;
+    rdfs:range xsd:string .
+
+:rightText
+    a owl:DatatypeProperty ;
+    rdfs:label "right text" ;
+    :definition "The text describing a right or entitlement." ;
+    :description "Use to preserve the provision language supporting a right." ;
+    rdfs:domain :Right ;
+    rdfs:range xsd:string .
+
+:conditionText
+    a owl:DatatypeProperty ;
+    rdfs:label "condition text" ;
+    :definition "The text describing a condition, trigger, exception, or prerequisite." ;
+    :description "Use for conditional rights and obligations." ;
+    rdfs:domain :Condition ;
+    rdfs:range xsd:string .
+
+:remedyText
+    a owl:DatatypeProperty ;
+    rdfs:label "remedy text" ;
+    :definition "The text describing a remedy or consequence." ;
+    :description "Use to preserve source language for remedies." ;
+    rdfs:domain :Remedy ;
+    rdfs:range xsd:string .
+
+:deliverableDescription
+    a owl:DatatypeProperty ;
+    rdfs:label "deliverable description" ;
+    :definition "A textual description of a deliverable." ;
+    :description "Use for service outputs, products, documents, milestones, or work products." ;
+    rdfs:domain :Deliverable ;
+    rdfs:range xsd:string .
+
+:serviceDescription
+    a owl:DatatypeProperty ;
+    rdfs:label "service description" ;
+    :definition "A textual description of a service." ;
+    :description "Use for service scope." ;
+    rdfs:domain :Service ;
+    rdfs:range xsd:string .
+
+:productDescription
+    a owl:DatatypeProperty ;
+    rdfs:label "product description" ;
+    :definition "A textual description of a product." ;
+    :description "Use for goods, equipment, subscriptions, or software products." ;
+    rdfs:domain :Product ;
+    rdfs:range xsd:string .
+
+:paymentAmount
+    a owl:DatatypeProperty ;
+    rdfs:label "payment amount" ;
+    :definition "A numeric monetary amount for a payment, invoice, fee, cap, threshold, or damages amount." ;
+    :description "Use a decimal value with currency specified separately." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:paymentCurrency
+    a owl:DatatypeProperty ;
+    rdfs:label "payment currency" ;
+    :definition "The currency for a monetary amount." ;
+    :description "Use ISO 4217 currency codes where possible." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:paymentDueDate
+    a owl:DatatypeProperty ;
+    rdfs:label "payment due date" ;
+    :definition "The date by which a payment is due." ;
+    :description "Use for invoice and payment obligation tracking." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:dateTime .
+
+:paymentTermsText
+    a owl:DatatypeProperty ;
+    rdfs:label "payment terms text" ;
+    :definition "The text describing payment timing, invoicing, taxes, late payment, or billing mechanics." ;
+    :description "Use for payment clause extracts." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:invoiceNumber
+    a owl:DatatypeProperty ;
+    rdfs:label "invoice number" ;
+    :definition "An identifier assigned to an invoice." ;
+    :description "Use for invoice matching." ;
+    rdfs:domain :Invoice ;
+    rdfs:range xsd:string .
+
+:limitationOfLiabilityAmount
+    a owl:DatatypeProperty ;
+    rdfs:label "limitation of liability amount" ;
+    :definition "A monetary liability cap amount." ;
+    :description "Use where a liability cap is expressed as a fixed amount." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:liabilityCapMultiple
+    a owl:DatatypeProperty ;
+    rdfs:label "liability cap multiple" ;
+    :definition "A multiple used to calculate a liability cap, such as fees paid in a period." ;
+    :description "Use for caps expressed as a multiple rather than fixed amount." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:interestRate
+    a owl:DatatypeProperty ;
+    rdfs:label "interest rate" ;
+    :definition "A rate used for late payment interest, default interest, or other contract interest." ;
+    :description "Use decimal percentages or normalized numeric rates with clear convention." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:confidentialityLevel
+    a owl:DatatypeProperty ;
+    rdfs:label "confidentiality level" ;
+    :definition "A sensitivity or confidentiality classification." ;
+    :description "Use for public, confidential, restricted, highly confidential, or similar labels." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:riskScore
+    a owl:DatatypeProperty ;
+    rdfs:label "risk score" ;
+    :definition "A numeric score representing the severity or priority of a risk or finding." ;
+    :description "Use with an agreed scoring scale." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:riskSeverity
+    a owl:DatatypeProperty ;
+    rdfs:label "risk severity" ;
+    :definition "A categorical severity label for a risk or finding." ;
+    :description "Use labels such as low, medium, high, critical, accepted, or informational." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:findingSummary
+    a owl:DatatypeProperty ;
+    rdfs:label "finding summary" ;
+    :definition "A short summary of a review finding." ;
+    :description "Use for issue lists and review reports." ;
+    rdfs:domain :ReviewFinding ;
+    rdfs:range xsd:string .
+
+:recommendedAction
+    a owl:DatatypeProperty ;
+    rdfs:label "recommended action" ;
+    :definition "A recommended negotiation, review, approval, remediation, or operational action." ;
+    :description "Use for playbook guidance and issue resolution." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:reviewStatusText
+    a owl:DatatypeProperty ;
+    rdfs:label "review status text" ;
+    :definition "A textual status for review progress or outcome." ;
+    :description "Use when review status is stored as a literal rather than an instance of ReviewStatus." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:approvalStatusText
+    a owl:DatatypeProperty ;
+    rdfs:label "approval status text" ;
+    :definition "A textual status for approval progress or outcome." ;
+    :description "Use for pending, approved, rejected, escalated, accepted risk, or not required." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:extractedText
+    a owl:DatatypeProperty ;
+    rdfs:label "extracted text" ;
+    :definition "Text extracted from a source document." ;
+    :description "Use with extraction results and source spans." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:normalizedValue
+    a owl:DatatypeProperty ;
+    rdfs:label "normalized value" ;
+    :definition "A normalized value derived from source text." ;
+    :description "Use for cleaned dates, amounts, statuses, or standardized text values." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:string .
+
+:extractionConfidence
+    a owl:DatatypeProperty ;
+    rdfs:label "extraction confidence" ;
+    :definition "A numeric confidence score for an extraction result." ;
+    :description "Use values between 0 and 1 unless another convention is documented." ;
+    rdfs:domain owl:Thing ;
+    rdfs:range xsd:decimal .
+
+:sourcePage
+    a owl:DatatypeProperty ;
+    rdfs:label "source page" ;
+    :definition "The page number in a source document." ;
+    :description "Use for page-level provenance." ;
+    rdfs:domain :SourceSpan ;
+    rdfs:range xsd:integer .
+
+:sourceStartOffset
+    a owl:DatatypeProperty ;
+    rdfs:label "source start offset" ;
+    :definition "The start character, byte, or token offset for a source span." ;
+    :description "Use with a documented offset convention." ;
+    rdfs:domain :SourceSpan ;
+    rdfs:range xsd:integer .
+
+:sourceEndOffset
+    a owl:DatatypeProperty ;
+    rdfs:label "source end offset" ;
+    :definition "The end character, byte, or token offset for a source span." ;
+    :description "Use with a documented offset convention." ;
+    rdfs:domain :SourceSpan ;
+    rdfs:range xsd:integer .
+
+#################################################################
+# Logical constraints
+#################################################################
+
+:Contract
+    owl:hasKey ( :contractIdentifier ) .
+
+:ContractDocument
+    owl:hasKey ( :documentName :repositoryPath ) .
+
+:Party
+    owl:hasKey ( :legalName :countryCode ) .
+
+:Invoice
+    owl:hasKey ( :invoiceNumber ) .
+
+[
+    a owl:AllDisjointClasses ;
+    owl:members (
+        :Clause
+        :Obligation
+        :Right
+        :ContractTerm
+        :Condition
+        :Remedy
+    )
+] .
+
+[
+    a owl:AllDisjointClasses ;
+    owl:members (
+        :DraftState
+        :NegotiationState
+        :ApprovedState
+        :ExecutedState
+        :ActiveState
+        :ExpiredState
+        :TerminatedState
+    )
+] .

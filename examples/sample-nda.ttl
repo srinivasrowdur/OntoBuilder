@@ -1,0 +1,217 @@
+@prefix contract: <https://rowdur.com/ontology/contracts#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix ex: <https://rowdur.com/ontology/contracts/examples/sample-nda#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://rowdur.com/ontology/contracts/examples/sample-nda>
+    a owl:Ontology ;
+    dcterms:title "Sample NDA example for the Rowdur contracts ontology" ;
+    dcterms:creator "Rowdur" ;
+    dcterms:created "2026-05-30T00:00:00Z"^^xsd:dateTime ;
+    dcterms:description "Example individuals showing how to represent a mutual non-disclosure agreement with the Rowdur contracts ontology." ;
+    owl:imports <https://rowdur.com/ontology/contracts> .
+
+ex:EmailNotice
+    a contract:NoticeMethod ;
+    rdfs:label "Email notice" ;
+    contract:definition "Notice delivered by email." ;
+    contract:description "Starter individual for a common contractual notice method." .
+
+ex:CourierNotice
+    a contract:NoticeMethod ;
+    rdfs:label "Courier notice" ;
+    contract:definition "Notice delivered by courier or tracked delivery service." ;
+    contract:description "Starter individual for formal physical notice delivery." .
+
+ex:EnglandAndWales
+    a contract:Jurisdiction ;
+    rdfs:label "England and Wales" ;
+    contract:definition "The jurisdiction of England and Wales." ;
+    contract:description "Starter individual for governing law and forum examples." ;
+    contract:jurisdictionName "England and Wales" ;
+    contract:countryCode "GB" .
+
+ex:AcmeLtd
+    a contract:Organization, contract:Supplier, contract:Signatory ;
+    rdfs:label "Acme Ltd" ;
+    contract:definition "A sample organization acting as a supplier and signatory." ;
+    contract:description "Starter party individual for examples." ;
+    contract:partyName "Acme Ltd" ;
+    contract:legalName "Acme Ltd" ;
+    contract:countryCode "GB" .
+
+ex:BetaLtd
+    a contract:Organization, contract:Customer, contract:Signatory ;
+    rdfs:label "Beta Ltd" ;
+    contract:definition "A sample organization acting as a customer and signatory." ;
+    contract:description "Starter party individual for examples." ;
+    contract:partyName "Beta Ltd" ;
+    contract:legalName "Beta Ltd" ;
+    contract:countryCode "GB" .
+
+ex:SampleNDAFamily
+    a contract:ContractFamily ;
+    rdfs:label "Sample NDA family" ;
+    contract:definition "A sample family grouping the NDA and related example records." ;
+    contract:description "Starter individual showing how contract families group related items." .
+
+ex:SampleNDADocument
+    a contract:ContractDocument ;
+    rdfs:label "Sample NDA document" ;
+    contract:definition "A sample source document for the sample NDA." ;
+    contract:description "Starter document individual for source tracking." ;
+    contract:documentName "Sample NDA.pdf" ;
+    contract:documentFormat "application/pdf" .
+
+ex:SampleNDA
+    a contract:NonDisclosureAgreement ;
+    rdfs:label "Sample NDA" ;
+    contract:definition "A sample mutual non-disclosure agreement used to demonstrate the ontology." ;
+    contract:description "This individual connects parties, document metadata, clauses, obligations, jurisdiction, notices, and review findings." ;
+    contract:contractIdentifier "NDA-001" ;
+    contract:contractTitle "Sample mutual non-disclosure agreement" ;
+    contract:effectiveDate "2026-05-29T00:00:00Z"^^xsd:dateTime ;
+    contract:autoRenews false ;
+    contract:belongsToFamily ex:SampleNDAFamily ;
+    contract:hasDocument ex:SampleNDADocument ;
+    contract:hasLifecycleState ex:ActiveStateExample ;
+    contract:hasParty ex:AcmeLtd, ex:BetaLtd ;
+    contract:hasSupplier ex:AcmeLtd ;
+    contract:hasCustomer ex:BetaLtd ;
+    contract:hasSignatory ex:AcmeLtd, ex:BetaLtd ;
+    contract:hasClause ex:SampleConfidentialityClause, ex:SampleGoverningLawClause, ex:SampleNoticeClause ;
+    contract:hasObligation ex:SampleConfidentialityObligation, ex:SampleNoticeObligation ;
+    contract:hasRight ex:SampleTerminationRight ;
+    contract:hasCondition ex:SampleMaterialBreachCondition ;
+    contract:hasRemedy ex:SampleTerminationRemedy ;
+    contract:hasTerm ex:SampleEffectiveDateTerm ;
+    contract:hasEvent ex:SampleExecutionEvent ;
+    contract:governedBy ex:EnglandAndWales ;
+    contract:hasReviewFinding ex:SampleConfidentialityFinding .
+
+ex:ActiveStateExample
+    a contract:ActiveState ;
+    rdfs:label "Active" ;
+    contract:definition "A sample lifecycle state indicating the contract is active." ;
+    contract:description "Starter individual for lifecycle state examples." .
+
+ex:SampleConfidentialityClause
+    a contract:ConfidentialityClause ;
+    rdfs:label "Sample confidentiality clause" ;
+    contract:definition "A sample clause imposing confidentiality duties on both parties." ;
+    contract:description "This demonstrates clause text, clause numbering, and obligation linkage." ;
+    contract:clauseNumber "2" ;
+    contract:clauseHeading "Confidentiality" ;
+    contract:clauseText "Each party must protect confidential information disclosed under the agreement and use it only for the permitted purpose." ;
+    contract:imposesObligation ex:SampleConfidentialityObligation ;
+    contract:hasConfidentialInformation ex:SampleConfidentialInformation .
+
+ex:SampleGoverningLawClause
+    a contract:GoverningLawClause ;
+    rdfs:label "Sample governing law clause" ;
+    contract:definition "A sample clause selecting England and Wales as governing law." ;
+    contract:description "This demonstrates normalized jurisdiction linkage." ;
+    contract:clauseNumber "10" ;
+    contract:clauseHeading "Governing law" ;
+    contract:clauseText "This agreement is governed by the laws of England and Wales." ;
+    contract:governingLawText "This agreement is governed by the laws of England and Wales." ;
+    contract:governedBy ex:EnglandAndWales .
+
+ex:SampleNoticeClause
+    a contract:NoticeClause ;
+    rdfs:label "Sample notice clause" ;
+    contract:definition "A sample clause requiring notices by email or courier." ;
+    contract:description "This demonstrates notice methods and notice obligations." ;
+    contract:clauseNumber "9" ;
+    contract:clauseHeading "Notices" ;
+    contract:clauseText "Notices must be sent by email with confirmation or by courier to the address stated in the agreement." ;
+    contract:hasNoticeMethod ex:EmailNotice, ex:CourierNotice ;
+    contract:imposesObligation ex:SampleNoticeObligation .
+
+ex:SampleConfidentialityObligation
+    a contract:ConfidentialityObligation ;
+    rdfs:label "Sample confidentiality obligation" ;
+    contract:definition "A sample mutual obligation to protect confidential information." ;
+    contract:description "This demonstrates an obligation owed by and owed to both parties in a mutual NDA." ;
+    contract:obligationText "Protect confidential information and use it only for the permitted purpose." ;
+    contract:owedBy ex:AcmeLtd, ex:BetaLtd ;
+    contract:owedTo ex:AcmeLtd, ex:BetaLtd ;
+    contract:hasConfidentialInformation ex:SampleConfidentialInformation .
+
+ex:SampleNoticeObligation
+    a contract:NoticeObligation ;
+    rdfs:label "Sample notice obligation" ;
+    contract:definition "A sample obligation to send formal notices using permitted methods." ;
+    contract:description "This demonstrates notice method modelling." ;
+    contract:obligationText "Send formal notices by email with confirmation or by courier." ;
+    contract:owedBy ex:AcmeLtd, ex:BetaLtd ;
+    contract:owedTo ex:AcmeLtd, ex:BetaLtd ;
+    contract:hasNoticeMethod ex:EmailNotice, ex:CourierNotice .
+
+ex:SampleConfidentialInformation
+    a contract:ConfidentialInformation ;
+    rdfs:label "Sample confidential information" ;
+    contract:definition "Sample information protected by the NDA." ;
+    contract:description "Starter individual showing confidential information scope." ;
+    contract:confidentialityLevel "Confidential" .
+
+ex:SampleEffectiveDateTerm
+    a contract:EffectiveDateTerm ;
+    rdfs:label "Sample effective date term" ;
+    contract:definition "A sample term representing the NDA effective date." ;
+    contract:description "Starter term individual." ;
+    contract:effectiveDate "2026-05-29T00:00:00Z"^^xsd:dateTime .
+
+ex:SampleExecutionEvent
+    a contract:ExecutionEvent ;
+    rdfs:label "Sample execution event" ;
+    contract:definition "A sample event representing execution of the NDA." ;
+    contract:description "Starter lifecycle event individual." ;
+    contract:eventDate "2026-05-29T00:00:00Z"^^xsd:dateTime ;
+    contract:performedBy ex:AcmeLtd, ex:BetaLtd .
+
+ex:SampleMaterialBreachCondition
+    a contract:Condition ;
+    rdfs:label "Sample material breach condition" ;
+    contract:definition "A sample condition representing a material breach trigger." ;
+    contract:description "Starter condition individual used to trigger the sample termination right." ;
+    contract:conditionText "A party commits a material breach and fails to cure it within the applicable cure period." .
+
+ex:SampleTerminationRight
+    a contract:Right, contract:TerminationRight ;
+    rdfs:label "Sample termination right" ;
+    contract:definition "A sample right allowing termination after uncured material breach." ;
+    contract:description "Starter right individual that appears directly under Right in Protege and demonstrates exercisableBy and triggeredBy." ;
+    contract:rightText "The non-breaching party may terminate the agreement if the other party commits a material breach and fails to cure it." ;
+    contract:exercisableBy ex:AcmeLtd, ex:BetaLtd ;
+    contract:triggeredBy ex:SampleMaterialBreachCondition .
+
+ex:SampleTerminationRemedy
+    a contract:Remedy ;
+    rdfs:label "Sample termination remedy" ;
+    contract:definition "A sample remedy available after an uncured material breach." ;
+    contract:description "Starter remedy individual linked to the sample material breach condition and termination right." ;
+    contract:remedyText "Termination of the agreement following uncured material breach." ;
+    contract:triggeredBy ex:SampleMaterialBreachCondition ;
+    contract:remediates ex:SampleMaterialBreachCondition .
+
+ex:SampleConfidentialityFinding
+    a contract:ReviewFinding ;
+    rdfs:label "Sample confidentiality finding" ;
+    contract:definition "A sample review finding about confidentiality scope." ;
+    contract:description "Starter review finding for contract intelligence workflows." ;
+    contract:findingSummary "Confirm whether affiliates and representatives are covered by the confidentiality obligation." ;
+    contract:recommendedAction "Review defined terms and add explicit affiliate and representative coverage if required." ;
+    contract:riskSeverity "Medium" ;
+    contract:riskScore "0.45"^^xsd:decimal ;
+    contract:hasRisk ex:SampleConfidentialityRisk .
+
+ex:SampleConfidentialityRisk
+    a contract:LegalRisk ;
+    rdfs:label "Sample confidentiality risk" ;
+    contract:definition "A sample legal risk relating to unclear confidentiality coverage." ;
+    contract:description "Starter risk individual for review finding examples." ;
+    contract:riskSeverity "Medium" ;
+    contract:riskScore "0.45"^^xsd:decimal .
