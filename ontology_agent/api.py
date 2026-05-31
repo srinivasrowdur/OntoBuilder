@@ -12,6 +12,7 @@ from ontology_agent.review import (
     BulkStatementDecisionRequest,
     CommitResponse,
     DraftReviewSession,
+    EntityUpdateRequest,
     ReviewStore,
     StatementDecisionRequest,
     StatementReview,
@@ -158,6 +159,22 @@ def create_app(
             return review_store.bulk_update(draft_id, decision)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.patch(
+        "/api/ontology/drafts/{draft_id}/entities/{entity_id}",
+        response_model=DraftReviewSession,
+        tags=["review"],
+    )
+    def update_entity(
+        draft_id: str,
+        entity_id: str,
+        request: EntityUpdateRequest,
+    ) -> DraftReviewSession:
+        _get_session_or_404(review_store, draft_id)
+        try:
+            return review_store.update_entity(draft_id, entity_id, request)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Entity not found: {entity_id}") from exc
 
     @app.post(
         "/api/ontology/drafts/{draft_id}/commit",

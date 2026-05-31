@@ -77,6 +77,17 @@ export function getDraft(draftId: string): Promise<DraftReviewSession> {
   return requestJson<DraftReviewSession>(`/api/ontology/drafts/${draftId}`);
 }
 
+export function updateEntityLabel(
+  draftId: string,
+  entityId: Identifier,
+  label: string,
+): Promise<DraftReviewSession> {
+  return requestJson<DraftReviewSession>(`/api/ontology/drafts/${draftId}/entities/${entityId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ label }),
+  });
+}
+
 export function commitDraft(draftId: string): Promise<CommitResponse> {
   return requestJson<CommitResponse>(`/api/ontology/drafts/${draftId}/commit`, {
     method: "POST",

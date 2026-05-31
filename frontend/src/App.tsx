@@ -6,6 +6,7 @@ import {
   createSampleDraft,
   getDraft,
   reviewStatement,
+  updateEntityLabel,
 } from "./api";
 import { OntologyCanvas } from "./components/OntologyCanvas";
 import { ReviewSidebar } from "./components/ReviewSidebar";
@@ -115,6 +116,20 @@ export function App() {
     }
   }
 
+  async function renameEntity(entityId: string, label: string) {
+    if (!session) {
+      return;
+    }
+    setError(null);
+    try {
+      setReviewSession(await updateEntityLabel(session.id, entityId, label));
+      setCommitted(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+      throw nextError;
+    }
+  }
+
   function downloadJson() {
     const payload = committed?.ontology ?? draft;
     if (!payload) {
@@ -146,6 +161,7 @@ export function App() {
     <main className="app-shell">
       <OntologyCanvas
         draft={draft}
+        onRenameEntity={renameEntity}
         onSelectStatement={setSelectedStatementId}
         selectedStatementId={selectedReview?.statement.id ?? null}
         session={session}

@@ -68,7 +68,8 @@ npm run dev -- --port 5173
 
 Open `http://localhost:5173`. This is the richer UI layer for statement review:
 the backend remains Python/FastAPI/Agno, while the frontend owns review
-selection state, statement editing, bulk approval, export, and commit actions.
+selection state, inline entity renaming, statement editing, bulk approval,
+export, and commit actions.
 
 Run the review API:
 
@@ -86,6 +87,7 @@ Core routes:
 - `POST /api/ontology/drafts/samples/retirements`: create a sample review session without calling an LLM.
 - `GET /api/ontology/drafts/{draft_id}`: read the draft and statement decisions.
 - `PATCH /api/ontology/drafts/{draft_id}/statements/{statement_id}`: review one statement.
+- `PATCH /api/ontology/drafts/{draft_id}/entities/{entity_id}`: rename an entity and refresh affected review statements.
 - `POST /api/ontology/drafts/{draft_id}/statements/review`: bulk review statements.
 - `POST /api/ontology/drafts/{draft_id}/commit`: build an ontology from accepted/edited statements.
 - `GET /api/ontology/drafts/{draft_id}/export`: export accepted or full draft JSON.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -72,6 +73,12 @@ class BulkStatementDecisionRequest(BaseModel):
     status: Literal["pending", "accepted", "rejected", "needs_clarification"]
     statement_ids: list[Identifier] | None = None
     comment: str | None = None
+
+
+class EntityUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(..., min_length=1)
 
 
 class CommitResponse(BaseModel):
@@ -171,6 +178,85 @@ class ReviewStore:
             )
             if review.statement.id in selected_ids
             else review
+            for review in session.statements
+        ]
+        session.updated_at = _now()
+        self.save(session)
+        return session
+
+    def update_entity(
+        self,
+        draft_id: str,
+        entity_id: str,
+        request: EntityUpdateRequest,
+    ) -> DraftReviewSession:
+        session = self.get(draft_id)
+        entities = []
+        old_label: str | None = None
+
+        for entity in session.draft.entities:
+            if entity.id == entity_id:
+                old_label = entity.label
+                entities.append(entity.model_copy(update={"label": request.label}))
+            else:
+                entities.append(entity)
+
+        if old_label is None:
+            raise KeyError(entity_id)
+
+        if old_label == request.label:
+            return session
+
+        draft_statements = [
+            statement.model_copy(
+                update={
+                    "text": _replace_entity_label(
+                        statement.text,
+                        old_label=old_label,
+                        new_label=request.label,
+                    )
+                }
+            )
+            for statement in session.draft.statements
+        ]
+        rules = [
+            rule.model_copy(
+                update={
+                    "text": _replace_entity_label(
+                        rule.text,
+                        old_label=old_label,
+                        new_label=request.label,
+                    )
+                }
+            )
+            for rule in session.draft.rules
+        ]
+        draft = session.draft.model_copy(
+            update={
+                "entities": entities,
+                "rules": rules,
+                "statements": draft_statements,
+            }
+        )
+        session.draft = draft
+        session.statements = [
+            review.model_copy(
+                update={
+                    "statement": review.statement.model_copy(
+                        update={
+                            "text": _replace_entity_label(
+                                review.statement.text,
+                                old_label=old_label,
+                                new_label=request.label,
+                            )
+                        }
+                    ),
+                }
+            )
+            for review in session.statements
+        ]
+        session.statements = [
+            review.model_copy(update={"impact": build_statement_impact(draft, review.statement)})
             for review in session.statements
         ]
         session.updated_at = _now()
@@ -304,6 +390,29 @@ def _find_statement_review(session: DraftReviewSession, statement_id: str) -> St
         if review.statement.id == statement_id:
             return review
     raise KeyError(statement_id)
+
+
+def _replace_entity_label(text: str, *, old_label: str, new_label: str) -> str:
+    next_text = text
+    if not old_label.lower().endswith("s"):
+        next_text = re.sub(
+            rf"\b{re.escape(old_label)}s\b",
+            _pluralize_label(new_label),
+            next_text,
+            flags=re.IGNORECASE,
+        )
+    return re.sub(
+        rf"\b{re.escape(old_label)}\b",
+        new_label,
+        next_text,
+        flags=re.IGNORECASE,
+    )
+
+
+def _pluralize_label(label: str) -> str:
+    if label.lower().endswith("s"):
+        return label
+    return f"{label}s"
 
 
 def _now() -> datetime:

@@ -124,6 +124,49 @@ def test_api_bulk_accepts_selected_statements(tmp_path):
     ]
 
 
+def test_api_updates_entity_labels_for_review_and_commit(tmp_path):
+    draft = OntologyDraft.model_validate_json(
+        (ROOT / "examples" / "retirements-ontology-draft.json").read_text()
+    )
+
+    def fake_build(prompt, **_kwargs):
+        return OntologyRunResult(draft=draft, logs="", domain=draft.domain, scope=draft.scope)
+
+    client = TestClient(create_app(store=ReviewStore(tmp_path), build_draft=fake_build))
+    session = client.post(
+        "/api/ontology/drafts",
+        json={"prompt": "Build an ontology for retirements"},
+    ).json()
+
+    rename_response = client.patch(
+        f"/api/ontology/drafts/{session['id']}/entities/member",
+        json={"label": "Plan Member"},
+    )
+
+    assert rename_response.status_code == 200
+    renamed = rename_response.json()
+    member = next(entity for entity in renamed["draft"]["entities"] if entity["id"] == "member")
+    assert member["label"] == "Plan Member"
+    assert renamed["statements"][0]["statement"]["text"] == (
+        "A Plan Member belongs to a Pension Scheme."
+    )
+    assert renamed["statements"][0]["impact"]["entities"][0]["label"] == "Plan Member"
+
+    client.post(
+        f"/api/ontology/drafts/{session['id']}/statements/review",
+        json={"status": "accepted"},
+    )
+    commit_response = client.post(f"/api/ontology/drafts/{session['id']}/commit")
+
+    assert commit_response.status_code == 200
+    committed = commit_response.json()["ontology"]
+    assert any(
+        entity["id"] == "member" and entity["label"] == "Plan Member"
+        for entity in committed["entities"]
+    )
+    assert committed["statements"][0]["text"] == "A Plan Member belongs to a Pension Scheme."
+
+
 def test_api_imports_existing_draft_for_review(tmp_path):
     draft = OntologyDraft.model_validate_json(
         (ROOT / "examples" / "retirements-ontology-draft.json").read_text()
