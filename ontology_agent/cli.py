@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import redirect_stderr, redirect_stdout
-import io
 import json
-import re
 import sys
-from typing import Any
 
-from ontology_agent.agent import build_ontology_agent
 from ontology_agent.config import load_config
 from ontology_agent.knowledge import build_vector_knowledge, ingest_default_knowledge
-from ontology_agent.repair import repair_ontology_draft_payload
-from ontology_agent.schema import OntologyDraft, OntologyRequest
-from ontology_agent.skills import build_skill_context, build_skill_index
+from ontology_agent.schema import OntologyDraft
+from ontology_agent.service import (
+    build_draft_from_prompt,
+    parse_freeform_request,
+    response_to_draft,
+)
+from ontology_agent.skills import build_skill_index
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if command in {"build", "ask"}:
         if command == "ask":
-            parsed_request = _parse_freeform_request(args.request)
+            parsed_request = parse_freeform_request(args.request)
             domain = parsed_request["domain"]
             scope = args.scope or parsed_request["scope"]
             request_text = args.request
@@ -79,37 +78,24 @@ def main(argv: list[str] | None = None) -> int:
             request_text = None
 
         try:
-            skill_context = build_skill_context(domain, scope, config.skills_dir)
-            runtime_logs = io.StringIO()
-            request = OntologyRequest(
-                domain=domain,
+            result = build_draft_from_prompt(
+                request_text or f"Build an ontology for {domain}",
                 scope=scope,
                 jurisdiction=args.jurisdiction,
-                request_text=request_text,
-                skill_context=skill_context,
+                user_id=args.user_id,
+                session_id=args.session_id,
+                config=config,
             )
-            with redirect_stdout(runtime_logs), redirect_stderr(runtime_logs):
-                agent = build_ontology_agent(config)
-                response = agent.run(
-                    input=request,
-                    user_id=args.user_id or config.user_id,
-                    session_id=args.session_id or config.session_id,
-                    dependencies={"ontology_skill_context": skill_context},
-                    add_dependencies_to_context=True,
-                )
+            draft = result.draft
         except RuntimeError as exc:
-            if "runtime_logs" in locals() and runtime_logs.getvalue():
-                print(runtime_logs.getvalue(), file=sys.stderr)
             print(str(exc), file=sys.stderr)
             return 1
         except Exception as exc:
-            if "runtime_logs" in locals() and runtime_logs.getvalue():
-                print(runtime_logs.getvalue(), file=sys.stderr)
             print(str(exc), file=sys.stderr)
             return 1
-        if config.debug and runtime_logs.getvalue():
-            print(runtime_logs.getvalue(), file=sys.stderr)
-        data = _response_to_jsonable(response.content)
+        if config.debug and result.logs:
+            print(result.logs, file=sys.stderr)
+        data = draft.model_dump(mode="json")
         print(json.dumps(data, indent=None if args.compact else 2))
         return 0
 
@@ -117,56 +103,11 @@ def main(argv: list[str] | None = None) -> int:
     return 2
 
 
-def _response_to_jsonable(content: Any) -> dict[str, Any]:
-    if isinstance(content, OntologyDraft):
-        return content.model_dump(mode="json")
-    if hasattr(content, "model_dump"):
-        return content.model_dump(mode="json")
-    if isinstance(content, str):
-        try:
-            draft = OntologyDraft.model_validate_json(content)
-        except Exception:
-            draft = repair_ontology_draft_payload(content)
-        return draft.model_dump(mode="json")
-    if isinstance(content, dict):
-        try:
-            draft = OntologyDraft.model_validate(content)
-        except Exception:
-            draft = repair_ontology_draft_payload(content)
-        return draft.model_dump(mode="json")
-    raise TypeError(f"Unsupported response content type: {type(content)!r}")
+_parse_freeform_request = parse_freeform_request
 
 
-def _parse_freeform_request(request: str) -> dict[str, str | None]:
-    text = " ".join(request.strip().split())
-    scope = None
-
-    scope_markers = [
-        " scoped to ",
-        " with scope ",
-        " focusing on ",
-        " focused on ",
-        " around ",
-    ]
-    for marker in scope_markers:
-        if marker in text.lower():
-            index = text.lower().index(marker)
-            scope = text[index + len(marker) :].strip(" .")
-            text = text[:index].strip(" .")
-            break
-
-    domain = text
-    patterns = [
-        r"(?i)^.*?\b(?:ontology|model)\s+(?:for|about|of)\s+(.+)$",
-        r"(?i)^.*?\b(?:for|about|of)\s+(.+)$",
-    ]
-    for pattern in patterns:
-        match = re.match(pattern, text)
-        if match:
-            domain = match.group(1).strip(" .")
-            break
-
-    return {"domain": domain, "scope": scope}
+def _response_to_jsonable(content):
+    return response_to_draft(content).model_dump(mode="json")
 
 
 if __name__ == "__main__":

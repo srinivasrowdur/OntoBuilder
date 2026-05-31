@@ -1,9 +1,9 @@
 import json
 
 from ontology_agent.config import ROOT
-from ontology_agent.cli import _parse_freeform_request
 from ontology_agent.repair import repair_ontology_draft_payload
 from ontology_agent.schema import OntologyDraft
+from ontology_agent.service import parse_freeform_request
 from ontology_agent.skills import build_skill_context, plan_ontology_skills
 from ontology_agent.tools import make_identifier, validate_ontology_draft_json
 
@@ -14,7 +14,7 @@ def test_make_identifier_normalizes_labels():
 
 
 def test_parse_freeform_request_extracts_domain_and_scope():
-    parsed = _parse_freeform_request(
+    parsed = parse_freeform_request(
         "Build an ontology for insurance claims focused on policy administration"
     )
 

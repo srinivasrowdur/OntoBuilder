@@ -62,6 +62,12 @@ Users can ask for any domain directly:
 python -m ontology_agent.cli ask "Build an ontology for insurance claims"
 ```
 
+Run the local Streamlit UI:
+
+```sh
+python -m streamlit run streamlit_app.py
+```
+
 Internally, the agent is skill-driven: scope control, generic domain discovery,
 concept gathering, relationship design, rule design, statement rendering,
 consistency validation, and JSON export are separate `SKILL.md` modules under

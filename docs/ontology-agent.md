@@ -50,6 +50,14 @@ python -m ontology_agent.cli build "insurance claims" --scope "policy administra
 
 All commands emit JSON to stdout.
 
+Run the visual UI:
+
+```sh
+python -m streamlit run streamlit_app.py
+```
+
+The UI renders ontology statements on the left and keeps the chat prompt/history on the right.
+
 ## Internal Skill Workflow
 
 The core workflow is split into discrete skills:
