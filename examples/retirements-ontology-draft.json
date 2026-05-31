@@ -1,0 +1,321 @@
+{
+  "domain": "retirements",
+  "scope": "workplace pension schemes",
+  "namespace_suggestion": "https://example.com/ontology/retirements#",
+  "summary": "A starter ontology for retirement and pension-scheme modeling, covering scheme participation, sponsorship, contributions, beneficiaries, accounts, and validation rules.",
+  "entities": [
+    {
+      "id": "member",
+      "label": "Member",
+      "entity_type": "role",
+      "description": "A person who participates in a pension scheme.",
+      "aliases": ["Participant", "Scheme member"],
+      "parent_entity_id": null,
+      "examples": ["An employee enrolled in a workplace pension scheme."],
+      "confidence": 0.92
+    },
+    {
+      "id": "pension_scheme",
+      "label": "Pension Scheme",
+      "entity_type": "class",
+      "description": "A retirement arrangement that governs eligibility, contributions, benefits, administration, and payout rules.",
+      "aliases": ["Retirement plan", "Pension plan"],
+      "parent_entity_id": null,
+      "examples": ["A defined contribution workplace pension scheme."],
+      "confidence": 0.94
+    },
+    {
+      "id": "contribution",
+      "label": "Contribution",
+      "entity_type": "event",
+      "description": "A payment or allocation made into a pension scheme or member account.",
+      "aliases": ["Pension contribution", "Plan contribution"],
+      "parent_entity_id": null,
+      "examples": ["A monthly employee pension contribution."],
+      "confidence": 0.91
+    },
+    {
+      "id": "employer",
+      "label": "Employer",
+      "entity_type": "role",
+      "description": "An organization that employs a member and may sponsor or contribute to a pension scheme.",
+      "aliases": ["Sponsoring employer"],
+      "parent_entity_id": null,
+      "examples": ["A company sponsoring a workplace pension scheme."],
+      "confidence": 0.9
+    },
+    {
+      "id": "beneficiary",
+      "label": "Beneficiary",
+      "entity_type": "role",
+      "description": "A person or party nominated to receive benefits if a member dies or another triggering event occurs.",
+      "aliases": ["Nominee"],
+      "parent_entity_id": null,
+      "examples": ["A spouse nominated by a member."],
+      "confidence": 0.9
+    },
+    {
+      "id": "account",
+      "label": "Account",
+      "entity_type": "class",
+      "description": "A member-level record of balances, contributions, investments, and transactions.",
+      "aliases": ["Member account"],
+      "parent_entity_id": null,
+      "examples": ["A defined contribution member account."],
+      "confidence": 0.86
+    },
+    {
+      "id": "enrollment_event",
+      "label": "Enrollment Event",
+      "entity_type": "event",
+      "description": "An event that records a member joining or being enrolled into a pension scheme.",
+      "aliases": ["Enrollment", "Joining event"],
+      "parent_entity_id": null,
+      "examples": ["Automatic enrollment into a workplace pension scheme."],
+      "confidence": 0.84
+    }
+  ],
+  "relationships": [
+    {
+      "id": "member_belongs_to_pension_scheme",
+      "subject_entity_id": "member",
+      "predicate": "belongs_to",
+      "label": "belongs to",
+      "object_entity_id": "pension_scheme",
+      "relationship_type": "participation",
+      "cardinality": {
+        "min_count": 1,
+        "max_count": null,
+        "text": "one or more"
+      },
+      "inverse_label": "has member",
+      "description": "A member participates in at least one pension scheme.",
+      "confidence": 0.88
+    },
+    {
+      "id": "member_makes_contribution",
+      "subject_entity_id": "member",
+      "predicate": "makes",
+      "label": "makes",
+      "object_entity_id": "contribution",
+      "relationship_type": "financial",
+      "cardinality": {
+        "min_count": 1,
+        "max_count": null,
+        "text": "one or more"
+      },
+      "inverse_label": "is made by",
+      "description": "A member may make one or more contributions to a pension scheme or account.",
+      "confidence": 0.84
+    },
+    {
+      "id": "employer_sponsors_pension_scheme",
+      "subject_entity_id": "employer",
+      "predicate": "sponsors",
+      "label": "sponsors",
+      "object_entity_id": "pension_scheme",
+      "relationship_type": "governance",
+      "cardinality": {
+        "min_count": 0,
+        "max_count": null,
+        "text": "zero or more"
+      },
+      "inverse_label": "is sponsored by",
+      "description": "An employer can sponsor a pension scheme for eligible workers.",
+      "confidence": 0.88
+    },
+    {
+      "id": "member_names_beneficiary",
+      "subject_entity_id": "member",
+      "predicate": "names",
+      "label": "names",
+      "object_entity_id": "beneficiary",
+      "relationship_type": "association",
+      "cardinality": {
+        "min_count": 0,
+        "max_count": null,
+        "text": "zero or more"
+      },
+      "inverse_label": "is named by",
+      "description": "A member can nominate beneficiaries for payable benefits.",
+      "confidence": 0.86
+    },
+    {
+      "id": "contribution_allocated_to_account",
+      "subject_entity_id": "contribution",
+      "predicate": "allocated_to",
+      "label": "is allocated to",
+      "object_entity_id": "account",
+      "relationship_type": "financial",
+      "cardinality": {
+        "min_count": 1,
+        "max_count": 1,
+        "text": "exactly one"
+      },
+      "inverse_label": "receives contribution",
+      "description": "A contribution is allocated to a member account.",
+      "confidence": 0.82
+    }
+  ],
+  "rules": [
+    {
+      "id": "contribution_amount_positive",
+      "applies_to_entity_id": "contribution",
+      "rule_type": "value_constraint",
+      "severity": "must",
+      "predicate": "amount",
+      "operator": "gt",
+      "value": 0,
+      "value_entity_id": null,
+      "value_datatype": "xsd:decimal",
+      "text": "A Contribution must have an amount greater than 0.",
+      "rationale": "A contribution with a zero or negative amount is not a valid payment into a retirement arrangement.",
+      "implementation_hint": "SHACL: sh:minExclusive 0 on contribution amount.",
+      "confidence": 0.92
+    },
+    {
+      "id": "member_eligible_before_enrollment",
+      "applies_to_entity_id": "enrollment_event",
+      "rule_type": "eligibility",
+      "severity": "must",
+      "predicate": "has_eligible_member",
+      "operator": "exists",
+      "value": null,
+      "value_entity_id": "member",
+      "value_datatype": "iri",
+      "text": "An Enrollment Event must involve a Member who satisfies eligibility criteria.",
+      "rationale": "Enrollment rules usually require a member to satisfy scheme-specific eligibility criteria.",
+      "implementation_hint": "Represent scheme-specific eligibility as separate rule entities or SHACL shapes.",
+      "confidence": 0.78
+    },
+    {
+      "id": "beneficiary_nomination_requires_named_beneficiary",
+      "applies_to_entity_id": "member",
+      "rule_type": "cardinality",
+      "severity": "should",
+      "predicate": "names",
+      "operator": "min_count",
+      "value": 1,
+      "value_entity_id": "beneficiary",
+      "value_datatype": "iri",
+      "text": "A Member should name at least one Beneficiary when beneficiary nomination is supported.",
+      "rationale": "A beneficiary nomination improves benefit administration for death or survivor benefits.",
+      "implementation_hint": "Make this a configurable business rule because some schemes allow but do not require nominations.",
+      "confidence": 0.74
+    }
+  ],
+  "statements": [
+    {
+      "id": "statement_member_belongs_to_pension_scheme",
+      "kind": "relationship",
+      "text": "A Member belongs to a Pension Scheme.",
+      "subject_entity_id": "member",
+      "predicate": "belongs to",
+      "object_entity_id": "pension_scheme",
+      "relationship_id": "member_belongs_to_pension_scheme",
+      "rule_id": null
+    },
+    {
+      "id": "statement_member_makes_contribution",
+      "kind": "relationship",
+      "text": "A Member makes one or more Contributions.",
+      "subject_entity_id": "member",
+      "predicate": "makes one or more",
+      "object_entity_id": "contribution",
+      "relationship_id": "member_makes_contribution",
+      "rule_id": null
+    },
+    {
+      "id": "statement_employer_sponsors_pension_scheme",
+      "kind": "relationship",
+      "text": "An Employer sponsors a Pension Scheme.",
+      "subject_entity_id": "employer",
+      "predicate": "sponsors",
+      "object_entity_id": "pension_scheme",
+      "relationship_id": "employer_sponsors_pension_scheme",
+      "rule_id": null
+    },
+    {
+      "id": "statement_member_names_beneficiary",
+      "kind": "relationship",
+      "text": "A Member names a Beneficiary.",
+      "subject_entity_id": "member",
+      "predicate": "names",
+      "object_entity_id": "beneficiary",
+      "relationship_id": "member_names_beneficiary",
+      "rule_id": null
+    },
+    {
+      "id": "statement_contribution_allocated_to_account",
+      "kind": "relationship",
+      "text": "A Contribution is allocated to exactly one Account.",
+      "subject_entity_id": "contribution",
+      "predicate": "is allocated to exactly one",
+      "object_entity_id": "account",
+      "relationship_id": "contribution_allocated_to_account",
+      "rule_id": null
+    },
+    {
+      "id": "statement_contribution_amount_positive",
+      "kind": "rule",
+      "text": "A Contribution must have an amount greater than 0.",
+      "subject_entity_id": "contribution",
+      "predicate": "must have an amount greater than",
+      "object_entity_id": null,
+      "relationship_id": null,
+      "rule_id": "contribution_amount_positive"
+    },
+    {
+      "id": "statement_member_eligible_before_enrollment",
+      "kind": "rule",
+      "text": "An Enrollment Event must involve a Member who satisfies eligibility criteria.",
+      "subject_entity_id": "enrollment_event",
+      "predicate": "must involve eligible member",
+      "object_entity_id": "member",
+      "relationship_id": null,
+      "rule_id": "member_eligible_before_enrollment"
+    },
+    {
+      "id": "statement_beneficiary_nomination_requires_named_beneficiary",
+      "kind": "rule",
+      "text": "A Member should name at least one Beneficiary when beneficiary nomination is supported.",
+      "subject_entity_id": "member",
+      "predicate": "should name at least one",
+      "object_entity_id": "beneficiary",
+      "relationship_id": null,
+      "rule_id": "beneficiary_nomination_requires_named_beneficiary"
+    }
+  ],
+  "competency_questions": [
+    {
+      "id": "which_scheme_does_member_belong_to",
+      "question": "Which pension scheme does a member belong to?",
+      "expected_entities": ["member", "pension_scheme"],
+      "expected_relationships": ["member_belongs_to_pension_scheme"]
+    },
+    {
+      "id": "who_sponsors_scheme",
+      "question": "Which employer sponsors a pension scheme?",
+      "expected_entities": ["employer", "pension_scheme"],
+      "expected_relationships": ["employer_sponsors_pension_scheme"]
+    },
+    {
+      "id": "which_contributions_are_invalid",
+      "question": "Which contributions have an amount that is not greater than zero?",
+      "expected_entities": ["contribution"],
+      "expected_relationships": []
+    }
+  ],
+  "assumptions": [
+    "The draft models a workplace pension scheme at a conceptual level rather than a specific jurisdictional implementation.",
+    "Contribution and eligibility rules are draft validation rules and should be checked against the scheme rules and applicable law."
+  ],
+  "open_questions": [
+    "Which jurisdiction's pension regulations should define eligibility, auto-enrollment, withdrawal, and benefit rules?",
+    "Is the scheme defined contribution, defined benefit, hybrid, or another type?"
+  ],
+  "extension_points": [
+    "Add Scheme Type, Investment Fund, Benefit, Trustee, Administrator, Vesting Rule, Withdrawal Event, and Retirement Event for a fuller retirement model.",
+    "Map validation rules to SHACL shapes after the domain policy decisions are confirmed."
+  ]
+}

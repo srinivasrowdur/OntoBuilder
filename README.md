@@ -49,3 +49,23 @@ Regenerate diagrams after ontology or example edits:
 ```sh
 /Users/srinivas/anaconda3/bin/python scripts/generate_ontology_visuals.py
 ```
+
+## Ontology Agent
+
+This repository also includes an Agno-oriented ontology drafting agent scaffold under
+`ontology_agent/`. It generates parseable JSON for a domain with entities,
+relationships, rules, and natural-language statements.
+
+Users can ask for any domain directly:
+
+```sh
+python -m ontology_agent.cli ask "Build an ontology for insurance claims"
+```
+
+Internally, the agent is skill-driven: scope control, generic domain discovery,
+concept gathering, relationship design, rule design, statement rendering,
+consistency validation, and JSON export are separate `SKILL.md` modules under
+`ontology_agent/skills/`. Domain-specific skills are optional developer
+extensions, not something users need to create.
+
+See `docs/ontology-agent.md` and `examples/retirements-ontology-draft.json`.

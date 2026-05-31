@@ -1,6 +1,9 @@
 .DS_Store
+.env
+.venv/
+tmp/
+*.egg-info/
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
-
