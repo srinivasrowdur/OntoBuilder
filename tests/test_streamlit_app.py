@@ -10,6 +10,8 @@ def test_streamlit_app_renders_sample_without_agent_call():
     markdown = "\n".join(element.value for element in app.markdown)
     assert "Export readiness" in markdown
     assert "Pension Scheme" in markdown
+    assert "is allocated to exactly one" in markdown
     assert "greater than 0" in markdown
+    assert "+ 3 more statements" not in markdown
     assert "Ontology chat" in markdown
     assert len(app.text_area) == 1

@@ -135,15 +135,7 @@ def _render_chat_panel() -> None:
 
 def _render_ontology_panel(draft: OntologyDraft) -> str:
     readiness, blocking_issues = _readiness(draft)
-    visible_statement_count = 5
-    preview_statements = _preview_statements(draft, visible_statement_count)
-    statements = "\n".join(_render_statement(statement, draft) for statement in preview_statements)
-    hidden_count = max(0, len(draft.statements) - visible_statement_count)
-    footer = (
-        f"<div class='more-statements'>+ {hidden_count} more statements in JSON export</div>"
-        if hidden_count
-        else ""
-    )
+    statements = "\n".join(_render_statement(statement, draft) for statement in draft.statements)
     return (
         '<section class="ontology-panel">\n'
         '  <div class="status-line">\n'
@@ -158,7 +150,6 @@ def _render_ontology_panel(draft: OntologyDraft) -> str:
         '  <div class="statement-list">\n'
         f"{statements}\n"
         "  </div>\n"
-        f"{footer}\n"
         '  <div class="stats-row">\n'
         f"    <span>{len(draft.entities)} entities</span>\n"
         f"    <span>{len(draft.relationships)} relationships</span>\n"
@@ -167,31 +158,6 @@ def _render_ontology_panel(draft: OntologyDraft) -> str:
         "  </div>\n"
         "</section>"
     )
-
-
-def _preview_statements(
-    draft: OntologyDraft, visible_statement_count: int
-) -> list[NaturalLanguageStatement]:
-    selected_indexes: list[int] = []
-
-    def add_index(index: int) -> None:
-        if index not in selected_indexes and len(selected_indexes) < visible_statement_count:
-            selected_indexes.append(index)
-
-    relationship_slots = max(0, visible_statement_count - 1)
-    for index, statement in enumerate(draft.statements):
-        if statement.kind == "relationship" and len(selected_indexes) < relationship_slots:
-            add_index(index)
-
-    for index, statement in enumerate(draft.statements):
-        if statement.kind == "rule":
-            add_index(index)
-            break
-
-    for index in range(len(draft.statements)):
-        add_index(index)
-
-    return [draft.statements[index] for index in selected_indexes]
 
 
 def _render_statement(statement: NaturalLanguageStatement, draft: OntologyDraft) -> str:
@@ -433,19 +399,13 @@ def _inject_css() -> None:
             gap: 0.55rem;
             margin: 2.75rem auto 0;
           }
-          .stats-row span,
-          .more-statements {
+          .stats-row span {
             color: #a9b1c4;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 0.45rem;
             padding: 0.48rem 0.7rem;
             font: 650 0.78rem/1 ui-sans-serif, system-ui;
-          }
-          .more-statements {
-            max-width: 980px;
-            margin: 1.5rem auto 0;
-            width: fit-content;
           }
           .chat-panel {
             background: var(--panel);
