@@ -143,3 +143,15 @@ def test_api_imports_existing_draft_for_review(tmp_path):
     assert session["draft"]["domain"] == "retirements"
     assert session["source_prompt"] == "Sample retirement draft"
     assert len(session["statements"]) == len(draft.statements)
+
+
+def test_api_creates_sample_draft_for_frontend(tmp_path):
+    client = TestClient(create_app(store=ReviewStore(tmp_path)))
+
+    response = client.post("/api/ontology/drafts/samples/retirements")
+
+    assert response.status_code == 200
+    session = response.json()
+    assert session["draft"]["domain"] == "retirements"
+    assert session["source_prompt"] == "Sample retirements draft"
+    assert len(session["statements"]) == 8

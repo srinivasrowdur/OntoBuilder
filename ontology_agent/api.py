@@ -4,9 +4,10 @@ from collections.abc import Callable
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
-from ontology_agent.config import load_config
+from ontology_agent.config import ROOT, load_config
 from ontology_agent.review import (
     BulkStatementDecisionRequest,
     CommitResponse,
@@ -61,6 +62,18 @@ def create_app(
         ),
         version="0.1.0",
     )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8501",
+            "http://127.0.0.1:8501",
+        ],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/api/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
@@ -92,6 +105,18 @@ def create_app(
     )
     def import_draft(request: DraftImportRequest) -> DraftReviewSession:
         return review_store.create_session(request.draft, source_prompt=request.source_prompt)
+
+    @app.post(
+        "/api/ontology/drafts/samples/{sample_name}",
+        response_model=DraftReviewSession,
+        tags=["drafts"],
+    )
+    def create_sample_draft(sample_name: Literal["retirements"]) -> DraftReviewSession:
+        sample_paths = {
+            "retirements": ROOT / "examples" / "retirements-ontology-draft.json",
+        }
+        draft = OntologyDraft.model_validate_json(sample_paths[sample_name].read_text())
+        return review_store.create_session(draft, source_prompt=f"Sample {sample_name} draft")
 
     @app.get(
         "/api/ontology/drafts/{draft_id}",

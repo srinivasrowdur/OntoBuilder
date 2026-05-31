@@ -1,0 +1,183 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  bulkReview,
+  commitDraft,
+  createDraft,
+  createSampleDraft,
+  getDraft,
+  reviewStatement,
+} from "./api";
+import { OntologyCanvas } from "./components/OntologyCanvas";
+import { ReviewSidebar } from "./components/ReviewSidebar";
+import { draftForDisplay, getReviewCounts } from "./ontology";
+import type { CommitResponse, DraftReviewSession, ReviewStatus } from "./types";
+
+export function App() {
+  const [session, setSession] = useState<DraftReviewSession | null>(null);
+  const [selectedStatementId, setSelectedStatementId] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState<CommitResponse | null>(null);
+
+  const draft = useMemo(() => draftForDisplay(session), [session]);
+  const selectedReview = useMemo(() => {
+    if (!session) {
+      return null;
+    }
+    const selected =
+      session.statements.find((review) => review.statement.id === selectedStatementId) ??
+      session.statements[0] ??
+      null;
+    return selected;
+  }, [selectedStatementId, session]);
+
+  useEffect(() => {
+    if (!session) {
+      void loadSample();
+    }
+  }, []);
+
+  async function loadSample() {
+    setLoading(true);
+    setError(null);
+    try {
+      const nextSession = await createSampleDraft();
+      setReviewSession(nextSession);
+      setCommitted(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateDraft() {
+    if (!prompt.trim()) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const nextSession = await createDraft(prompt.trim());
+      setReviewSession(nextSession);
+      setCommitted(null);
+      setPrompt("");
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function applyDecision(status: ReviewStatus, text?: string) {
+    if (!session || !selectedReview) {
+      return;
+    }
+    setError(null);
+    try {
+      await reviewStatement(session.id, selectedReview.statement.id, status, text);
+      setReviewSession(await getDraft(session.id));
+      setCommitted(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  async function acceptAllPending() {
+    if (!session) {
+      return;
+    }
+    const pendingIds = session.statements
+      .filter((review) => review.status === "pending")
+      .map((review) => review.statement.id);
+    if (pendingIds.length === 0) {
+      return;
+    }
+    setError(null);
+    try {
+      setReviewSession(await bulkReview(session.id, "accepted", pendingIds));
+      setCommitted(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  async function commitAccepted() {
+    if (!session) {
+      return;
+    }
+    setError(null);
+    try {
+      setCommitted(await commitDraft(session.id));
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  function downloadJson() {
+    const payload = committed?.ontology ?? draft;
+    if (!payload) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${slug(payload.domain)}-ontology.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function setReviewSession(nextSession: DraftReviewSession) {
+    setSession(nextSession);
+    setSelectedStatementId((currentId) => {
+      const statementIds = nextSession.statements.map((review) => review.statement.id);
+      return currentId && statementIds.includes(currentId) ? currentId : statementIds[0] ?? null;
+    });
+  }
+
+  const counts = session ? getReviewCounts(session.statements) : null;
+  const acceptedCount = counts ? counts.accepted + counts.edited : 0;
+
+  return (
+    <main className="app-shell">
+      <OntologyCanvas
+        draft={draft}
+        onSelectStatement={setSelectedStatementId}
+        selectedStatementId={selectedReview?.statement.id ?? null}
+        session={session}
+      />
+      <ReviewSidebar
+        canCommit={acceptedCount > 0}
+        committed={committed}
+        error={error}
+        loading={loading}
+        onAcceptAll={acceptAllPending}
+        onCommit={commitAccepted}
+        onDecision={applyDecision}
+        onDownload={downloadJson}
+        onGenerate={generateDraft}
+        onLoadSample={loadSample}
+        onPromptChange={setPrompt}
+        onSelectStatement={setSelectedStatementId}
+        prompt={prompt}
+        selectedReview={selectedReview}
+        session={session}
+      />
+      <div className="commit-meter" aria-live="polite">
+        {acceptedCount} of {session?.statements.length ?? 0} statements accepted
+      </div>
+    </main>
+  );
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ontology";
+}

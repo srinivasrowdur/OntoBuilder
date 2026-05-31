@@ -58,6 +58,18 @@ python -m streamlit run streamlit_app.py
 
 The UI renders ontology statements on the left and keeps the chat prompt/history on the right.
 
+Run the React review UI:
+
+```sh
+cd frontend
+npm install
+npm run dev -- --port 5173
+```
+
+Open `http://localhost:5173`. This is the richer UI layer for statement review:
+the backend remains Python/FastAPI/Agno, while the frontend owns review
+selection state, statement editing, bulk approval, export, and commit actions.
+
 Run the review API:
 
 ```sh
@@ -71,6 +83,7 @@ statements before committing them into the final ontology.
 Core routes:
 
 - `POST /api/ontology/drafts`: run the Agno ontology agent and create a review session.
+- `POST /api/ontology/drafts/samples/retirements`: create a sample review session without calling an LLM.
 - `GET /api/ontology/drafts/{draft_id}`: read the draft and statement decisions.
 - `PATCH /api/ontology/drafts/{draft_id}/statements/{statement_id}`: review one statement.
 - `POST /api/ontology/drafts/{draft_id}/statements/review`: bulk review statements.

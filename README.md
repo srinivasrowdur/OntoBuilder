@@ -78,6 +78,17 @@ Open `http://localhost:8000/docs` for the generated API docs. The API lets a
 frontend create an ontology draft, approve or edit individual statements, and
 commit only the accepted statements into an exportable ontology JSON payload.
 
+Run the React review UI:
+
+```sh
+cd frontend
+npm install
+npm run dev -- --port 5173
+```
+
+Open `http://localhost:5173`. Keep the FastAPI review API running on port 8000
+while using the React UI.
+
 Internally, the agent is skill-driven: scope control, generic domain discovery,
 concept gathering, relationship design, rule design, statement rendering,
 consistency validation, and JSON export are separate `SKILL.md` modules under
