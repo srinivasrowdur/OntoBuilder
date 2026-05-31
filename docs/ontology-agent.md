@@ -58,6 +58,25 @@ python -m streamlit run streamlit_app.py
 
 The UI renders ontology statements on the left and keeps the chat prompt/history on the right.
 
+Run the review API:
+
+```sh
+python -m uvicorn ontology_agent.api:app --reload --port 8000
+```
+
+The API is the backend boundary for richer frontends. It exposes statement-level
+review state so the frontend can let users accept, edit, reject, or flag
+statements before committing them into the final ontology.
+
+Core routes:
+
+- `POST /api/ontology/drafts`: run the Agno ontology agent and create a review session.
+- `GET /api/ontology/drafts/{draft_id}`: read the draft and statement decisions.
+- `PATCH /api/ontology/drafts/{draft_id}/statements/{statement_id}`: review one statement.
+- `POST /api/ontology/drafts/{draft_id}/statements/review`: bulk review statements.
+- `POST /api/ontology/drafts/{draft_id}/commit`: build an ontology from accepted/edited statements.
+- `GET /api/ontology/drafts/{draft_id}/export`: export accepted or full draft JSON.
+
 ## Internal Skill Workflow
 
 The core workflow is split into discrete skills:

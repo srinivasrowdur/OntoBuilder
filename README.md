@@ -68,6 +68,16 @@ Run the local Streamlit UI:
 python -m streamlit run streamlit_app.py
 ```
 
+Run the local FastAPI review API:
+
+```sh
+python -m uvicorn ontology_agent.api:app --reload --port 8000
+```
+
+Open `http://localhost:8000/docs` for the generated API docs. The API lets a
+frontend create an ontology draft, approve or edit individual statements, and
+commit only the accepted statements into an exportable ontology JSON payload.
+
 Internally, the agent is skill-driven: scope control, generic domain discovery,
 concept gathering, relationship design, rule design, statement rendering,
 consistency validation, and JSON export are separate `SKILL.md` modules under

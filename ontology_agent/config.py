@@ -15,6 +15,7 @@ class AgentConfig:
     root: Path = ROOT
     db_path: Path = ROOT / "tmp" / "ontology-agent.db"
     vector_path: Path = ROOT / "tmp" / "ontology-agent-vectors"
+    review_path: Path = ROOT / "tmp" / "ontology-review-sessions"
     skills_dir: Path = ROOT / "ontology_agent" / "skills"
     model: str = "openai:gpt-5.2"
     vector_db: str = "none"
@@ -33,9 +34,13 @@ def load_config() -> AgentConfig:
     vector_path = Path(
         os.getenv("ONTOLOGY_AGENT_VECTOR_PATH", str(ROOT / "tmp" / "ontology-agent-vectors"))
     )
+    review_path = Path(
+        os.getenv("ONTOLOGY_AGENT_REVIEW_PATH", str(ROOT / "tmp" / "ontology-review-sessions"))
+    )
     return AgentConfig(
         db_path=db_path,
         vector_path=vector_path,
+        review_path=review_path,
         model=os.getenv("ONTOLOGY_AGENT_MODEL", "openai:gpt-5.2"),
         vector_db=os.getenv("ONTOLOGY_AGENT_VECTOR_DB", "none").lower(),
         user_id=os.getenv("ONTOLOGY_AGENT_USER_ID", "local-user"),

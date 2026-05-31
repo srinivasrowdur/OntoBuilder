@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 from html import escape
+import json
+import os
 import re
+from typing import Any
+from urllib import error, request
 
 import streamlit as st
 
 from ontology_agent.config import ROOT
 from ontology_agent.schema import NaturalLanguageStatement, OntologyDraft, Relationship, Rule
-from ontology_agent.service import build_draft_from_prompt
 
 
 EXAMPLE_PATH = ROOT / "examples" / "retirements-ontology-draft.json"
+API_BASE_URL = os.getenv("ONTOLOGY_AGENT_API_URL", "http://127.0.0.1:8000").rstrip("/")
+REVIEW_STATUSES = {
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "edited": "Edited",
+    "rejected": "Rejected",
+    "needs_clarification": "Clarify",
+}
 
 
 def main() -> None:
@@ -34,11 +45,17 @@ def main() -> None:
 def _ensure_state() -> None:
     if "current_draft" not in st.session_state:
         st.session_state.current_draft = _load_example_draft()
+    if "review_session" not in st.session_state:
+        st.session_state.review_session = None
+    if "selected_statement_id" not in st.session_state:
+        st.session_state.selected_statement_id = None
+    if "committed_ontology" not in st.session_state:
+        st.session_state.committed_ontology = None
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "Ask for any domain and I will draft entities, relationships, rules, and statements.",
+                "content": "Ask for any domain and I will draft reviewable ontology statements.",
             }
         ]
     if "last_error" not in st.session_state:
@@ -47,6 +64,169 @@ def _ensure_state() -> None:
 
 def _load_example_draft() -> OntologyDraft:
     return OntologyDraft.model_validate_json(EXAMPLE_PATH.read_text())
+
+
+def _load_sample_review_session() -> None:
+    draft = _load_example_draft()
+    st.session_state.last_error = None
+    try:
+        session = _api_import_draft(draft)
+    except Exception as exc:
+        st.session_state.current_draft = draft
+        st.session_state.review_session = None
+        st.session_state.committed_ontology = None
+        st.session_state.selected_statement_id = None
+        st.session_state.last_error = str(exc)
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": "Loaded the retirement sample without API review state.",
+            }
+        )
+    else:
+        _set_review_session(session)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": "Loaded the retirement sample for review."}
+        )
+
+
+def _set_review_session(session: dict[str, Any]) -> None:
+    st.session_state.review_session = session
+    st.session_state.current_draft = _display_draft_from_session(session)
+    st.session_state.committed_ontology = None
+    statement_ids = [review["statement"]["id"] for review in session["statements"]]
+    if st.session_state.selected_statement_id not in statement_ids:
+        st.session_state.selected_statement_id = statement_ids[0] if statement_ids else None
+
+
+def _display_draft_from_session(session: dict[str, Any]) -> OntologyDraft:
+    draft_data = dict(session["draft"])
+    draft_data["statements"] = [review["statement"] for review in session["statements"]]
+    return OntologyDraft.model_validate(draft_data)
+
+
+def _review_counts(reviews: list[dict[str, Any]]) -> dict[str, int]:
+    counts = {status: 0 for status in REVIEW_STATUSES}
+    for review in reviews:
+        counts[review["status"]] += 1
+    return counts
+
+
+def _selected_statement_id(reviews: list[dict[str, Any]]) -> str | None:
+    statement_ids = [review["statement"]["id"] for review in reviews]
+    if st.session_state.selected_statement_id in statement_ids:
+        return st.session_state.selected_statement_id
+    return statement_ids[0] if statement_ids else None
+
+
+def _review_by_statement_id(
+    reviews: list[dict[str, Any]], statement_id: str | None
+) -> dict[str, Any] | None:
+    return next(
+        (review for review in reviews if review["statement"]["id"] == statement_id),
+        None,
+    )
+
+
+def _format_statement_option(reviews: list[dict[str, Any]], statement_id: str) -> str:
+    review = _review_by_statement_id(reviews, statement_id)
+    if not review:
+        return statement_id
+    status = REVIEW_STATUSES[review["status"]]
+    return f"{status}: {review['statement']['text']}"
+
+
+def _api_create_draft(prompt: str) -> dict[str, Any]:
+    return _api_request(
+        "POST",
+        "/api/ontology/drafts",
+        {"prompt": prompt},
+        timeout=180,
+    )
+
+
+def _api_import_draft(draft: OntologyDraft) -> dict[str, Any]:
+    return _api_request(
+        "POST",
+        "/api/ontology/drafts/import",
+        {
+            "draft": draft.model_dump(mode="json"),
+            "source_prompt": "Sample retirement draft",
+        },
+    )
+
+
+def _api_get_draft(draft_id: str) -> dict[str, Any]:
+    return _api_request("GET", f"/api/ontology/drafts/{draft_id}")
+
+
+def _api_review_statement(
+    draft_id: str,
+    statement_id: str,
+    status: str,
+    *,
+    text: str | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"status": status}
+    if text is not None:
+        payload["text"] = text
+    return _api_request(
+        "PATCH",
+        f"/api/ontology/drafts/{draft_id}/statements/{statement_id}",
+        payload,
+    )
+
+
+def _api_bulk_review(
+    draft_id: str,
+    status: str,
+    statement_ids: list[str],
+) -> dict[str, Any]:
+    return _api_request(
+        "POST",
+        f"/api/ontology/drafts/{draft_id}/statements/review",
+        {"status": status, "statement_ids": statement_ids},
+    )
+
+
+def _api_commit(draft_id: str) -> dict[str, Any]:
+    return _api_request("POST", f"/api/ontology/drafts/{draft_id}/commit")
+
+
+def _api_request(
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    *,
+    timeout: int = 30,
+) -> dict[str, Any]:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    api_request = request.Request(
+        f"{API_BASE_URL}{path}",
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with request.urlopen(api_request, timeout=timeout) as response:
+            body = response.read().decode("utf-8")
+    except error.HTTPError as exc:
+        raise RuntimeError(_api_error_message(exc)) from exc
+    except error.URLError as exc:
+        raise RuntimeError(
+            f"Review API is unavailable at {API_BASE_URL}. "
+            "Run `python -m uvicorn ontology_agent.api:app --port 8000`."
+        ) from exc
+    return json.loads(body) if body else {}
+
+
+def _api_error_message(exc: error.HTTPError) -> str:
+    body = exc.read().decode("utf-8")
+    try:
+        detail = json.loads(body).get("detail", body)
+    except json.JSONDecodeError:
+        detail = body
+    return f"API request failed ({exc.code}): {detail}"
 
 
 def _render_chat_panel() -> None:
@@ -91,46 +271,218 @@ def _render_chat_panel() -> None:
     with col_a:
         reset = st.button("Load sample", use_container_width=True)
     with col_b:
+        download_draft = st.session_state.committed_ontology or st.session_state.current_draft
         st.download_button(
             "Download JSON",
-            data=st.session_state.current_draft.model_dump_json(indent=2),
-            file_name=f"{_slug(st.session_state.current_draft.domain)}-ontology.json",
+            data=download_draft.model_dump_json(indent=2),
+            file_name=f"{_slug(download_draft.domain)}-ontology.json",
             mime="application/json",
             use_container_width=True,
         )
 
     if reset:
-        st.session_state.current_draft = _load_example_draft()
-        st.session_state.messages.append(
-            {"role": "assistant", "content": "Loaded the retirement sample."}
-        )
-        st.session_state.last_error = None
+        _load_sample_review_session()
         st.rerun()
 
     if submitted and prompt.strip():
         st.session_state.messages.append({"role": "user", "content": prompt.strip()})
         st.session_state.last_error = None
-        with st.spinner("Drafting ontology JSON..."):
+        with st.spinner("Drafting ontology JSON through the review API..."):
             try:
-                result = build_draft_from_prompt(prompt.strip())
+                session = _api_create_draft(prompt.strip())
             except Exception as exc:  # pragma: no cover - Streamlit runtime path
                 st.session_state.last_error = str(exc)
                 st.session_state.messages.append(
                     {"role": "assistant", "content": "I could not generate a valid ontology draft."}
                 )
             else:
-                st.session_state.current_draft = result.draft
+                _set_review_session(session)
+                draft = st.session_state.current_draft
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
                         "content": (
-                            f"Built {len(result.draft.entities)} entities, "
-                            f"{len(result.draft.relationships)} relationships, "
-                            f"{len(result.draft.rules)} rules."
+                            f"Built {len(draft.entities)} entities, "
+                            f"{len(draft.relationships)} relationships, "
+                            f"{len(draft.rules)} rules for review."
                         ),
                     }
                 )
         st.rerun()
+
+    _render_review_panel()
+
+
+def _render_review_panel() -> None:
+    session = st.session_state.review_session
+    st.markdown(
+        """
+        <section class="review-panel">
+          <div class="chat-heading">
+            <span>Statement review</span>
+            <small>API backed</small>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if not session:
+        st.markdown(
+            '<div class="review-empty">Load a sample or generate a draft to review statements.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    reviews = session["statements"]
+    counts = _review_counts(reviews)
+    st.markdown(
+        f"""
+        <div class="review-summary">
+          <span>{counts["accepted"] + counts["edited"]} accepted</span>
+          <span>{counts["pending"]} pending</span>
+          <span>{counts["rejected"]} rejected</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Accept all pending", use_container_width=True):
+        try:
+            _set_review_session(
+                _api_bulk_review(
+                    session["id"],
+                    "accepted",
+                    [
+                        review["statement"]["id"]
+                        for review in reviews
+                        if review["status"] == "pending"
+                    ],
+                )
+            )
+            st.session_state.messages.append(
+                {"role": "assistant", "content": "Accepted all pending statements."}
+            )
+        except Exception as exc:
+            st.session_state.last_error = str(exc)
+        st.rerun()
+
+    selected_id = _selected_statement_id(reviews)
+    selected_review = _review_by_statement_id(reviews, selected_id)
+    if selected_review is None:
+        return
+
+    statement_options = [review["statement"]["id"] for review in reviews]
+    selected_index = statement_options.index(selected_id)
+    selected_id = st.selectbox(
+        "Statement",
+        statement_options,
+        index=selected_index,
+        format_func=lambda statement_id: _format_statement_option(reviews, statement_id),
+        label_visibility="collapsed",
+    )
+    st.session_state.selected_statement_id = selected_id
+    selected_review = _review_by_statement_id(reviews, selected_id)
+    if selected_review is None:
+        return
+
+    _render_selected_statement_details(selected_review)
+
+    action_a, action_b = st.columns(2)
+    with action_a:
+        if st.button("Accept", use_container_width=True):
+            _apply_statement_decision(session["id"], selected_id, "accepted")
+    with action_b:
+        if st.button("Reject", use_container_width=True):
+            _apply_statement_decision(session["id"], selected_id, "rejected")
+
+    action_c, action_d = st.columns(2)
+    with action_c:
+        if st.button("Clarify", use_container_width=True):
+            _apply_statement_decision(session["id"], selected_id, "needs_clarification")
+    with action_d:
+        if st.button("Reset", use_container_width=True):
+            _apply_statement_decision(session["id"], selected_id, "pending")
+
+    with st.form(f"edit_statement_{selected_id}"):
+        edited_text = st.text_area(
+            "Edit statement",
+            value=selected_review["statement"]["text"],
+            height=92,
+            label_visibility="collapsed",
+        )
+        saved = st.form_submit_button("Save edit", use_container_width=True)
+        if saved:
+            _apply_statement_decision(
+                session["id"],
+                selected_id,
+                "edited",
+                text=edited_text.strip(),
+            )
+
+    if st.button("Commit accepted", use_container_width=True):
+        try:
+            committed = _api_commit(session["id"])
+            st.session_state.committed_ontology = OntologyDraft.model_validate(
+                committed["ontology"]
+            )
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": (
+                        f"Committed {len(committed['included_statement_ids'])} accepted statements."
+                    ),
+                }
+            )
+        except Exception as exc:
+            st.session_state.last_error = str(exc)
+        st.rerun()
+
+
+def _render_selected_statement_details(review: dict[str, Any]) -> None:
+    statement = review["statement"]
+    impact = review["impact"]
+    st.markdown(
+        f"""
+        <div class="selected-statement">
+          <span class="status-pill {escape(review["status"])}">
+            {escape(REVIEW_STATUSES[review["status"]])}
+          </span>
+          <p>{escape(statement["text"])}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    impact_items = [
+        *[f"Entity: {item['label']}" for item in impact["entities"]],
+        *[f"Relationship: {item['label']}" for item in impact["relationships"]],
+        *[f"Rule: {item['label']}" for item in impact["rules"]],
+    ]
+    st.markdown(
+        '<div class="impact-list">'
+        + "".join(f"<span>{escape(item)}</span>" for item in impact_items)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _apply_statement_decision(
+    draft_id: str,
+    statement_id: str,
+    status: str,
+    *,
+    text: str | None = None,
+) -> None:
+    if status == "edited" and not text:
+        st.session_state.last_error = "Edited statements require text."
+        st.rerun()
+    try:
+        _api_review_statement(draft_id, statement_id, status, text=text)
+        _set_review_session(_api_get_draft(draft_id))
+        st.session_state.last_error = None
+    except Exception as exc:
+        st.session_state.last_error = str(exc)
+    st.rerun()
 
 
 def _render_ontology_panel(draft: OntologyDraft) -> str:
@@ -414,6 +766,13 @@ def _inject_css() -> None:
             padding: 1.2rem;
             margin-bottom: 0.9rem;
           }
+          .review-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 0.5rem;
+            padding: 1.2rem;
+            margin: 1rem 0 0.9rem;
+          }
           .chat-heading {
             display: flex;
             justify-content: space-between;
@@ -449,6 +808,73 @@ def _inject_css() -> None:
             background: rgba(157, 45, 45, 0.22);
             border: 1px solid rgba(255, 120, 120, 0.25);
             font: 600 0.86rem/1.35 ui-sans-serif, system-ui;
+          }
+          .review-empty,
+          .selected-statement,
+          .impact-list {
+            border: 1px solid var(--line);
+            border-radius: 0.45rem;
+            background: rgba(255, 255, 255, 0.035);
+            color: #cfd6e8;
+            font: 600 0.84rem/1.42 ui-sans-serif, system-ui;
+            margin: 0 0 0.75rem;
+            padding: 0.78rem 0.86rem;
+          }
+          .review-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.45rem;
+            margin: 0 0 0.75rem;
+          }
+          .review-summary span {
+            border: 1px solid var(--line);
+            border-radius: 0.42rem;
+            background: rgba(255, 255, 255, 0.04);
+            color: #b5bed2;
+            padding: 0.52rem 0.48rem;
+            text-align: center;
+            font: 720 0.76rem/1 ui-sans-serif, system-ui;
+          }
+          .selected-statement p {
+            margin: 0.7rem 0 0;
+          }
+          .status-pill {
+            display: inline-flex;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 0.25rem 0.52rem;
+            font: 800 0.68rem/1 ui-sans-serif, system-ui;
+            text-transform: uppercase;
+          }
+          .status-pill.accepted,
+          .status-pill.edited {
+            color: #bff5d3;
+            background: rgba(50, 150, 92, 0.16);
+            border-color: rgba(96, 205, 137, 0.3);
+          }
+          .status-pill.rejected {
+            color: #ffc5c5;
+            background: rgba(157, 45, 45, 0.18);
+            border-color: rgba(255, 120, 120, 0.25);
+          }
+          .status-pill.needs_clarification {
+            color: var(--gold-text);
+            background: rgba(215, 168, 76, 0.12);
+            border-color: rgba(215, 168, 76, 0.28);
+          }
+          .impact-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.42rem;
+          }
+          .impact-list span {
+            border: 1px solid rgba(91, 143, 231, 0.22);
+            border-radius: 0.36rem;
+            background: rgba(91, 143, 231, 0.08);
+            color: #b9c9ea;
+            padding: 0.32rem 0.45rem;
+            font-size: 0.72rem;
+            line-height: 1.1;
           }
           div[data-testid="stForm"] {
             border: 1px solid var(--line);

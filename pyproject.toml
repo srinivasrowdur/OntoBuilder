@@ -5,6 +5,7 @@ description = "Agno-based ontology drafting agent with structured JSON output."
 requires-python = ">=3.11"
 dependencies = [
     "agno>=2.3.4",
+    "fastapi>=0.136",
     "openai>=2.0.0",
     "pydantic>=2.8",
     "python-dotenv>=1.0",
