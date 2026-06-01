@@ -93,6 +93,44 @@ def test_repair_normalizes_string_null_links():
     assert isinstance(repaired, OntologyDraft)
 
 
+def test_repair_drops_unknown_statement_relationships():
+    payload = json.loads((ROOT / "examples" / "retirements-ontology-draft.json").read_text())
+    payload["statements"].append(
+        {
+            "id": "statement_unknown_relationship",
+            "kind": "relationship",
+            "text": "A Control satisfies a Compliance Requirement.",
+            "subject_entity_id": "member",
+            "predicate": "satisfies",
+            "object_entity_id": "pension_scheme",
+            "relationship_id": "control_satisfies_compliance",
+            "rule_id": None,
+        }
+    )
+
+    repaired = repair_ontology_draft_payload(payload)
+
+    assert isinstance(repaired, OntologyDraft)
+    assert all(
+        statement.relationship_id != "control_satisfies_compliance"
+        for statement in repaired.statements
+    )
+
+
+def test_repair_drops_unknown_competency_question_relationships():
+    payload = json.loads((ROOT / "examples" / "retirements-ontology-draft.json").read_text())
+    payload["competency_questions"][0]["expected_relationships"].append(
+        "control_satisfies_compliance"
+    )
+
+    repaired = repair_ontology_draft_payload(payload)
+
+    assert isinstance(repaired, OntologyDraft)
+    assert "control_satisfies_compliance" not in repaired.competency_questions[
+        0
+    ].expected_relationships
+
+
 def test_skill_context_loads_planned_skills_in_order():
     context = build_skill_context(
         "retirements",

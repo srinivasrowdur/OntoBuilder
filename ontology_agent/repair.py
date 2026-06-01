@@ -12,6 +12,8 @@ def repair_ontology_draft_payload(payload: str | dict[str, Any]) -> OntologyDraf
     data = json.loads(payload) if isinstance(payload, str) else dict(payload)
     _normalize_optional_links(data)
     _repair_statement_links(data)
+    _drop_invalid_statement_links(data)
+    _drop_invalid_competency_question_links(data)
     _add_missing_relationship_statements(data)
     _add_missing_rule_statements(data)
     return OntologyDraft.model_validate(data)
@@ -69,6 +71,47 @@ def _repair_statement_links(data: dict[str, Any]) -> None:
             rule = rules[rule_id]
             statement["subject_entity_id"] = rule["applies_to_entity_id"]
             statement.setdefault("object_entity_id", rule.get("value_entity_id"))
+
+
+def _drop_invalid_statement_links(data: dict[str, Any]) -> None:
+    entity_ids = {entity["id"] for entity in data.get("entities", [])}
+    relationship_ids = {relationship["id"] for relationship in data.get("relationships", [])}
+    rule_ids = {rule["id"] for rule in data.get("rules", [])}
+    repaired_statements = []
+
+    for statement in data.get("statements", []):
+        subject_entity_id = statement.get("subject_entity_id")
+        object_entity_id = statement.get("object_entity_id")
+        if subject_entity_id not in entity_ids:
+            continue
+        if object_entity_id and object_entity_id not in entity_ids:
+            continue
+        if statement.get("kind") == "relationship":
+            if statement.get("relationship_id") not in relationship_ids:
+                continue
+        elif statement.get("kind") == "rule":
+            if statement.get("rule_id") not in rule_ids:
+                continue
+        repaired_statements.append(statement)
+
+    data["statements"] = repaired_statements
+
+
+def _drop_invalid_competency_question_links(data: dict[str, Any]) -> None:
+    entity_ids = {entity["id"] for entity in data.get("entities", [])}
+    relationship_ids = {relationship["id"] for relationship in data.get("relationships", [])}
+
+    for question in data.get("competency_questions", []):
+        question["expected_entities"] = [
+            entity_id
+            for entity_id in question.get("expected_entities", [])
+            if entity_id in entity_ids
+        ]
+        question["expected_relationships"] = [
+            relationship_id
+            for relationship_id in question.get("expected_relationships", [])
+            if relationship_id in relationship_ids
+        ]
 
 
 def _add_missing_relationship_statements(data: dict[str, Any]) -> None:
