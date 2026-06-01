@@ -1,15 +1,10 @@
 import { Check, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import {
-  getReadiness,
-  relationshipById,
-  ruleById,
-  ruleValuePhrase,
-  statementStatus,
-} from "../ontology";
+import { getReadiness, ruleById, ruleValuePhrase, statementStatus } from "../ontology";
 import type {
   DraftReviewSession,
+  Entity,
   NaturalLanguageStatement,
   OntologyDraft,
   StatementCreatePayload,
@@ -101,6 +96,7 @@ export function OntologyCanvas({
           <div
             className={[
               "statement-row",
+              `statement-${statement.kind}`,
               selectedStatementId === statement.id ? "selected" : "",
               statementStatus(session, statement),
             ].join(" ")}
@@ -108,23 +104,28 @@ export function OntologyCanvas({
             onClick={() => onSelectStatement(statement.id)}
           >
             <span className="statement-status" aria-hidden="true" />
-            <span className="statement">
-              {renderStatementParts(statement, draft).map((part, index) =>
-                renderStatementPart({
-                  editingEntity,
-                  editingLabel,
-                  entityLabels,
-                  index,
-                  onRenameEntity,
-                  onSelectStatement,
-                  part,
-                  savingEntityId,
-                  setEditingEntity,
-                  setEditingLabel,
-                  setSavingEntityId,
-                  statement,
-                }),
-              )}
+            <span className="statement-body">
+              <span className={`statement-kind ${statement.kind}`}>
+                {statement.kind === "rule" ? "Rule" : "Relationship"}
+              </span>
+              <span className="statement">
+                {renderStatementParts(statement, draft).map((part, index) =>
+                  renderStatementPart({
+                    editingEntity,
+                    editingLabel,
+                    entityLabels,
+                    index,
+                    onRenameEntity,
+                    onSelectStatement,
+                    part,
+                    savingEntityId,
+                    setEditingEntity,
+                    setEditingLabel,
+                    setSavingEntityId,
+                    statement,
+                  }),
+                )}
+              </span>
             </span>
           </div>
         ))}
@@ -323,44 +324,13 @@ function renderStatementParts(
   statement: NaturalLanguageStatement,
   draft: OntologyDraft,
 ): StatementPart[] {
-  const entityLabels = new Map(draft.entities.map((entity) => [entity.id, entity.label]));
   const ranges: TextRange[] = [];
 
-  if (statement.kind === "relationship") {
-    const relationship = relationshipById(draft, statement.relationship_id);
-    if (relationship) {
-      addEntityRange(
-        ranges,
-        statement.text,
-        entityLabels.get(relationship.subject_entity_id),
-        relationship.subject_entity_id,
-      );
-      addEntityRange(
-        ranges,
-        statement.text,
-        entityLabels.get(relationship.object_entity_id),
-        relationship.object_entity_id,
-      );
-    }
-  }
+  addEntityMentionRanges(ranges, statement.text, draft.entities);
 
   if (statement.kind === "rule") {
     const rule = ruleById(draft, statement.rule_id);
     if (rule) {
-      addEntityRange(
-        ranges,
-        statement.text,
-        entityLabels.get(rule.applies_to_entity_id),
-        rule.applies_to_entity_id,
-      );
-      if (rule.value_entity_id) {
-        addEntityRange(
-          ranges,
-          statement.text,
-          entityLabels.get(rule.value_entity_id),
-          rule.value_entity_id,
-        );
-      }
       const valuePhrase = ruleValuePhrase(rule);
       if (valuePhrase) {
         addLiteralRange(ranges, statement.text, valuePhrase, "constraint");
@@ -369,6 +339,17 @@ function renderStatementParts(
   }
 
   return splitTextWithRanges(statement.text, ranges);
+}
+
+function addEntityMentionRanges(ranges: TextRange[], text: string, entities: Entity[]) {
+  const sortedEntities = [...entities].sort((left, right) => {
+    const lengthDelta = right.label.length - left.label.length;
+    return lengthDelta || left.label.localeCompare(right.label);
+  });
+
+  for (const entity of sortedEntities) {
+    addEntityRange(ranges, text, entity.label, entity.id);
+  }
 }
 
 function addEntityRange(
@@ -380,11 +361,16 @@ function addEntityRange(
   if (!label) {
     return;
   }
-  const match = new RegExp(`\\b${escapeRegExp(label)}s?\\b`, "i").exec(text);
-  if (!match) {
-    return;
+
+  for (const variant of entityLabelVariants(label)) {
+    const pattern = new RegExp(`\\b${escapeRegExp(variant)}\\b`, "gi");
+    for (const match of text.matchAll(pattern)) {
+      if (match.index === undefined) {
+        continue;
+      }
+      addRange(ranges, match.index, match.index + match[0].length, match[0], "entity", entityId);
+    }
   }
-  addRange(ranges, match.index, match.index + match[0].length, match[0], "entity", entityId);
 }
 
 function addLiteralRange(
@@ -443,4 +429,36 @@ function splitTextWithRanges(text: string, ranges: TextRange[]): StatementPart[]
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function entityLabelVariants(label: string) {
+  const normalizedLabel = label.trim().replace(/\s+/g, " ");
+  const variants = new Set([normalizedLabel, pluralizeLabel(normalizedLabel)]);
+  return [...variants].sort((left, right) => right.length - left.length);
+}
+
+function pluralizeLabel(label: string) {
+  const words = label.split(" ");
+  const lastWord = words.pop();
+  if (!lastWord) {
+    return label;
+  }
+  return [...words, pluralizeWord(lastWord)].join(" ");
+}
+
+function pluralizeWord(word: string) {
+  const lower = word.toLowerCase();
+  if (lower.endsWith("y") && !/[aeiou]y$/.test(lower)) {
+    return `${word.slice(0, -1)}ies`;
+  }
+  if (
+    lower.endsWith("s") ||
+    lower.endsWith("x") ||
+    lower.endsWith("z") ||
+    lower.endsWith("ch") ||
+    lower.endsWith("sh")
+  ) {
+    return `${word}es`;
+  }
+  return `${word}s`;
 }

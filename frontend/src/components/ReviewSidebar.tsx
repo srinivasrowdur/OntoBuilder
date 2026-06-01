@@ -123,7 +123,9 @@ export function ReviewSidebar({
           >
             {session.statements.map((review) => (
               <option key={review.statement.id} value={review.statement.id}>
-                {STATUS_LABELS[review.status]}: {review.statement.text}
+                {STATUS_LABELS[review.status]} ·{" "}
+                {review.statement.kind === "rule" ? "Rule" : "Relationship"}:{" "}
+                {review.statement.text}
               </option>
             ))}
           </select>
@@ -160,7 +162,12 @@ function SelectedStatementCard({
 }) {
   return (
     <section className="selected-card">
-      <span className={`status-pill ${review.status}`}>{STATUS_LABELS[review.status]}</span>
+      <div className="selected-card-meta">
+        <span className={`status-pill ${review.status}`}>{STATUS_LABELS[review.status]}</span>
+        <span className={`kind-pill ${review.statement.kind}`}>
+          {review.statement.kind === "rule" ? "Rule" : "Relationship"}
+        </span>
+      </div>
       <p>{review.statement.text}</p>
 
       <div className="impact-list">

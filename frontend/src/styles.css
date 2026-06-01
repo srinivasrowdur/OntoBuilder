@@ -183,6 +183,45 @@ button:disabled {
   background: rgba(255, 255, 255, 0.13);
 }
 
+.statement-body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.statement-kind,
+.kind-pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.35rem;
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 820;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.statement-kind.relationship,
+.kind-pill.relationship {
+  color: var(--blue-text);
+  background: rgba(91, 143, 231, 0.13);
+  border: 1px solid rgba(91, 143, 231, 0.32);
+}
+
+.statement-kind.rule,
+.kind-pill.rule {
+  color: var(--gold-text);
+  background: rgba(215, 168, 76, 0.12);
+  border: 1px solid rgba(215, 168, 76, 0.32);
+}
+
+.statement-row.statement-rule .statement-status {
+  background: rgba(215, 168, 76, 0.42);
+}
+
 .statement-row.accepted .statement-status,
 .statement-row.edited .statement-status {
   background: var(--green);
@@ -597,6 +636,13 @@ select {
   display: grid;
   gap: 0.75rem;
   padding: 0.86rem;
+}
+
+.selected-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
 }
 
 .selected-card p {
