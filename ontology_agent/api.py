@@ -14,6 +14,7 @@ from ontology_agent.review import (
     DraftReviewSession,
     EntityUpdateRequest,
     ReviewStore,
+    StatementCreateRequest,
     StatementDecisionRequest,
     StatementReview,
 )
@@ -144,6 +145,23 @@ def create_app(
             raise HTTPException(
                 status_code=404, detail=f"Statement not found: {statement_id}"
             ) from exc
+
+    @app.post(
+        "/api/ontology/drafts/{draft_id}/statements",
+        response_model=DraftReviewSession,
+        tags=["review"],
+    )
+    def create_statement(
+        draft_id: str,
+        request: StatementCreateRequest,
+    ) -> DraftReviewSession:
+        _get_session_or_404(review_store, draft_id)
+        try:
+            return review_store.add_statement(draft_id, request)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post(
         "/api/ontology/drafts/{draft_id}/statements/review",

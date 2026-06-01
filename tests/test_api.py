@@ -167,6 +167,62 @@ def test_api_updates_entity_labels_for_review_and_commit(tmp_path):
     assert committed["statements"][0]["text"] == "A Plan Member belongs to a Pension Scheme."
 
 
+def test_api_creates_relationship_and_rule_statements(tmp_path):
+    draft = OntologyDraft.model_validate_json(
+        (ROOT / "examples" / "retirements-ontology-draft.json").read_text()
+    )
+
+    def fake_build(prompt, **_kwargs):
+        return OntologyRunResult(draft=draft, logs="", domain=draft.domain, scope=draft.scope)
+
+    client = TestClient(create_app(store=ReviewStore(tmp_path), build_draft=fake_build))
+    session = client.post(
+        "/api/ontology/drafts",
+        json={"prompt": "Build an ontology for retirements"},
+    ).json()
+
+    relationship_response = client.post(
+        f"/api/ontology/drafts/{session['id']}/statements",
+        json={
+            "kind": "relationship",
+            "subject": {"id": "member"},
+            "predicate_label": "owns",
+            "object": {"label": "Retirement Account", "entity_type": "class"},
+            "relationship_type": "financial",
+        },
+    )
+
+    assert relationship_response.status_code == 200
+    relationship_session = relationship_response.json()
+    assert len(relationship_session["draft"]["entities"]) == len(draft.entities) + 1
+    assert relationship_session["statements"][-1]["status"] == "pending"
+    assert relationship_session["statements"][-1]["statement"]["text"] == (
+        "A Member owns a Retirement Account."
+    )
+
+    rule_response = client.post(
+        f"/api/ontology/drafts/{session['id']}/statements",
+        json={
+            "kind": "rule",
+            "applies_to": {"id": "contribution"},
+            "rule_type": "value_constraint",
+            "severity": "must",
+            "predicate_label": "vesting age",
+            "operator": "gte",
+            "value": 55,
+            "value_datatype": "xsd:integer",
+        },
+    )
+
+    assert rule_response.status_code == 200
+    rule_session = rule_response.json()
+    assert rule_session["statements"][-1]["statement"]["kind"] == "rule"
+    assert rule_session["statements"][-1]["statement"]["text"] == (
+        "A Contribution must have a vesting age greater than or equal to 55."
+    )
+    assert len(rule_session["draft"]["rules"]) == len(draft.rules) + 1
+
+
 def test_api_imports_existing_draft_for_review(tmp_path):
     draft = OntologyDraft.model_validate_json(
         (ROOT / "examples" / "retirements-ontology-draft.json").read_text()

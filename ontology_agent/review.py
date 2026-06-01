@@ -8,11 +8,64 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ontology_agent.schema import Identifier, NaturalLanguageStatement, OntologyDraft
+from ontology_agent.schema import (
+    Entity,
+    Identifier,
+    NaturalLanguageStatement,
+    OntologyDraft,
+    Relationship,
+    Rule,
+)
 
 
 ReviewStatus = Literal["pending", "accepted", "rejected", "needs_clarification", "edited"]
 COMMITTABLE_STATUSES: set[ReviewStatus] = {"accepted", "edited"}
+EntityType = Literal[
+    "class",
+    "role",
+    "document",
+    "event",
+    "process",
+    "state",
+    "attribute",
+    "value",
+    "external_reference",
+]
+RelationshipType = Literal[
+    "association",
+    "composition",
+    "classification",
+    "participation",
+    "financial",
+    "temporal",
+    "governance",
+    "lifecycle",
+    "eligibility",
+]
+RuleType = Literal[
+    "cardinality",
+    "value_constraint",
+    "eligibility",
+    "temporal",
+    "calculation",
+    "compliance",
+    "lifecycle",
+    "validation",
+]
+RuleOperator = Literal[
+    "exists",
+    "eq",
+    "neq",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "in",
+    "not_in",
+    "min_count",
+    "max_count",
+    "pattern",
+]
 
 
 class ImpactReference(BaseModel):
@@ -79,6 +132,52 @@ class EntityUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     label: str = Field(..., min_length=1)
+
+
+class EntityReferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: Identifier | None = None
+    label: str | None = Field(default=None, min_length=1)
+    entity_type: EntityType = "class"
+    description: str | None = None
+
+    @model_validator(mode="after")
+    def validate_reference(self) -> "EntityReferenceRequest":
+        if not self.id and not self.label:
+            raise ValueError("entity reference requires id or label")
+        return self
+
+
+class StatementCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["relationship", "rule"]
+    subject: EntityReferenceRequest | None = None
+    object: EntityReferenceRequest | None = None
+    predicate_label: str | None = Field(default=None, min_length=1)
+    relationship_type: RelationshipType = "association"
+    applies_to: EntityReferenceRequest | None = None
+    rule_type: RuleType = "validation"
+    severity: Literal["must", "should", "may"] = "must"
+    operator: RuleOperator = "exists"
+    value: str | int | float | bool | list[str] | None = None
+    value_entity: EntityReferenceRequest | None = None
+    value_datatype: str | None = None
+
+    @model_validator(mode="after")
+    def validate_statement(self) -> "StatementCreateRequest":
+        if self.kind == "relationship":
+            if not self.subject or not self.object or not self.predicate_label:
+                raise ValueError(
+                    "relationship statements require subject, predicate_label, and object"
+                )
+        if self.kind == "rule":
+            if not self.applies_to or not self.predicate_label:
+                raise ValueError("rule statements require applies_to and predicate_label")
+            if self.operator != "exists" and self.value is None and self.value_entity is None:
+                raise ValueError("rule statements with this operator require a value")
+        return self
 
 
 class CommitResponse(BaseModel):
@@ -263,6 +362,20 @@ class ReviewStore:
         self.save(session)
         return session
 
+    def add_statement(
+        self,
+        draft_id: str,
+        request: StatementCreateRequest,
+    ) -> DraftReviewSession:
+        session = self.get(draft_id)
+        if request.kind == "relationship":
+            session = _add_relationship_statement(session, request)
+        else:
+            session = _add_rule_statement(session, request)
+        session.updated_at = _now()
+        self.save(session)
+        return session
+
     def commit(self, draft_id: str) -> CommitResponse:
         session = self.get(draft_id)
         return commit_session(session)
@@ -312,6 +425,179 @@ def build_statement_impact(
         relationships=relationships,
         rules=rules,
     )
+
+
+def _add_relationship_statement(
+    session: DraftReviewSession,
+    request: StatementCreateRequest,
+) -> DraftReviewSession:
+    if request.subject is None or request.object is None or request.predicate_label is None:
+        raise ValueError("relationship statement payload is incomplete")
+
+    draft = session.draft
+    entities = list(draft.entities)
+    subject, entities = _resolve_entity(entities, request.subject)
+    object_entity, entities = _resolve_entity(entities, request.object)
+    predicate = _identifier(request.predicate_label, fallback="relates_to")
+    relationship_ids = {relationship.id for relationship in draft.relationships}
+    relationship_id = _unique_id(
+        f"{subject.id}_{predicate}_{object_entity.id}",
+        relationship_ids,
+    )
+    relationship = Relationship(
+        id=relationship_id,
+        subject_entity_id=subject.id,
+        predicate=predicate,
+        label=request.predicate_label.strip(),
+        object_entity_id=object_entity.id,
+        relationship_type=request.relationship_type,
+        description=(f"{subject.label} {request.predicate_label.strip()} {object_entity.label}."),
+        confidence=0.7,
+    )
+    statement = NaturalLanguageStatement(
+        id=_unique_id(f"statement_{relationship_id}", {item.id for item in draft.statements}),
+        kind="relationship",
+        text=_relationship_statement_text(subject.label, relationship.label, object_entity.label),
+        subject_entity_id=subject.id,
+        predicate=relationship.label,
+        object_entity_id=object_entity.id,
+        relationship_id=relationship.id,
+    )
+    next_draft = OntologyDraft(
+        domain=draft.domain,
+        scope=draft.scope,
+        namespace_suggestion=draft.namespace_suggestion,
+        summary=draft.summary,
+        entities=entities,
+        relationships=[*draft.relationships, relationship],
+        rules=draft.rules,
+        statements=[*draft.statements, statement],
+        competency_questions=draft.competency_questions,
+        assumptions=draft.assumptions,
+        open_questions=draft.open_questions,
+        extension_points=draft.extension_points,
+    )
+    return _with_added_review(session, next_draft, statement)
+
+
+def _add_rule_statement(
+    session: DraftReviewSession,
+    request: StatementCreateRequest,
+) -> DraftReviewSession:
+    if request.applies_to is None or request.predicate_label is None:
+        raise ValueError("rule statement payload is incomplete")
+
+    draft = session.draft
+    entities = list(draft.entities)
+    applies_to, entities = _resolve_entity(entities, request.applies_to)
+    value_entity: Entity | None = None
+    if request.value_entity:
+        value_entity, entities = _resolve_entity(entities, request.value_entity)
+
+    predicate = _identifier(request.predicate_label, fallback="property")
+    rule_ids = {rule.id for rule in draft.rules}
+    value_token = str(request.value) if request.value is not None else "exists"
+    value_id_part = value_entity.id if value_entity else _identifier(value_token)
+    rule_id = _unique_id(
+        f"{applies_to.id}_{predicate}_{request.operator}_{value_id_part}",
+        rule_ids,
+    )
+    text = _rule_statement_text(
+        entity_label=applies_to.label,
+        severity=request.severity,
+        predicate_label=request.predicate_label.strip(),
+        operator=request.operator,
+        value=request.value,
+        value_entity_label=value_entity.label if value_entity else None,
+    )
+    rule = Rule(
+        id=rule_id,
+        applies_to_entity_id=applies_to.id,
+        rule_type=request.rule_type,
+        severity=request.severity,
+        predicate=predicate,
+        operator=request.operator,
+        value=request.value,
+        value_entity_id=value_entity.id if value_entity else None,
+        value_datatype=request.value_datatype,
+        text=text,
+        rationale="Added during human ontology review.",
+        implementation_hint="Review before mapping to SHACL, OWL, or application validation.",
+        confidence=0.7,
+    )
+    statement = NaturalLanguageStatement(
+        id=_unique_id(f"statement_{rule_id}", {item.id for item in draft.statements}),
+        kind="rule",
+        text=text,
+        subject_entity_id=applies_to.id,
+        predicate=_rule_statement_predicate(
+            request.severity,
+            request.predicate_label.strip(),
+            request.operator,
+        ),
+        object_entity_id=value_entity.id if value_entity else None,
+        rule_id=rule.id,
+    )
+    next_draft = OntologyDraft(
+        domain=draft.domain,
+        scope=draft.scope,
+        namespace_suggestion=draft.namespace_suggestion,
+        summary=draft.summary,
+        entities=entities,
+        relationships=draft.relationships,
+        rules=[*draft.rules, rule],
+        statements=[*draft.statements, statement],
+        competency_questions=draft.competency_questions,
+        assumptions=draft.assumptions,
+        open_questions=draft.open_questions,
+        extension_points=draft.extension_points,
+    )
+    return _with_added_review(session, next_draft, statement)
+
+
+def _with_added_review(
+    session: DraftReviewSession,
+    draft: OntologyDraft,
+    statement: NaturalLanguageStatement,
+) -> DraftReviewSession:
+    session.draft = draft
+    session.statements = [
+        *session.statements,
+        StatementReview(
+            statement=statement,
+            status="pending",
+            impact=build_statement_impact(draft, statement),
+        ),
+    ]
+    return session
+
+
+def _resolve_entity(
+    entities: list[Entity],
+    reference: EntityReferenceRequest,
+) -> tuple[Entity, list[Entity]]:
+    if reference.id:
+        for entity in entities:
+            if entity.id == reference.id:
+                return entity, entities
+        raise KeyError(reference.id)
+
+    label = (reference.label or "").strip()
+    for entity in entities:
+        if entity.label.lower() == label.lower():
+            return entity, entities
+
+    entity_ids = {entity.id for entity in entities}
+    entity = Entity(
+        id=_unique_id(_identifier(label, fallback="entity"), entity_ids),
+        label=label,
+        entity_type=reference.entity_type,
+        description=reference.description or f"{label} added during human ontology review.",
+        aliases=[],
+        examples=[],
+        confidence=0.65,
+    )
+    return entity, [*entities, entity]
 
 
 def commit_session(session: DraftReviewSession) -> CommitResponse:
@@ -390,6 +676,113 @@ def _find_statement_review(session: DraftReviewSession, statement_id: str) -> St
         if review.statement.id == statement_id:
             return review
     raise KeyError(statement_id)
+
+
+def _relationship_statement_text(
+    subject_label: str,
+    predicate_label: str,
+    object_label: str,
+) -> str:
+    return (
+        f"{_article(subject_label).capitalize()} {subject_label} "
+        f"{predicate_label} {_article(object_label)} {object_label}."
+    )
+
+
+def _rule_statement_text(
+    *,
+    entity_label: str,
+    severity: str,
+    predicate_label: str,
+    operator: str,
+    value: str | int | float | bool | list[str] | None,
+    value_entity_label: str | None,
+) -> str:
+    value_phrase = _rule_value_phrase(
+        operator=operator,
+        value=value,
+        value_entity_label=value_entity_label,
+    )
+    if value_phrase:
+        return (
+            f"{_article(entity_label).capitalize()} {entity_label} {severity} "
+            f"have {_article(predicate_label)} {predicate_label} {value_phrase}."
+        )
+    return (
+        f"{_article(entity_label).capitalize()} {entity_label} {severity} "
+        f"have {_article(predicate_label)} {predicate_label}."
+    )
+
+
+def _rule_statement_predicate(severity: str, predicate_label: str, operator: str) -> str:
+    if operator == "exists":
+        return f"{severity} have {predicate_label}"
+    return f"{severity} have {predicate_label} {operator}"
+
+
+def _rule_value_phrase(
+    *,
+    operator: str,
+    value: str | int | float | bool | list[str] | None,
+    value_entity_label: str | None,
+) -> str:
+    rendered_value = value_entity_label or _render_value(value)
+    if operator == "exists":
+        return ""
+    if operator == "gt":
+        return f"greater than {rendered_value}"
+    if operator == "gte":
+        return f"greater than or equal to {rendered_value}"
+    if operator == "lt":
+        return f"less than {rendered_value}"
+    if operator == "lte":
+        return f"less than or equal to {rendered_value}"
+    if operator == "eq":
+        return f"equal to {rendered_value}"
+    if operator == "neq":
+        return f"not equal to {rendered_value}"
+    if operator == "min_count":
+        return f"at least {rendered_value}"
+    if operator == "max_count":
+        return f"at most {rendered_value}"
+    if operator == "in":
+        return f"in {rendered_value}"
+    if operator == "not_in":
+        return f"not in {rendered_value}"
+    if operator == "pattern":
+        return f"matching {rendered_value}"
+    return rendered_value
+
+
+def _render_value(value: str | int | float | bool | list[str] | None) -> str:
+    if isinstance(value, list):
+        return ", ".join(value)
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _article(label: str) -> str:
+    return "an" if label[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+
+
+def _unique_id(base: str, existing_ids: set[str]) -> str:
+    candidate = _identifier(base, fallback="item")
+    if candidate not in existing_ids:
+        return candidate
+
+    counter = 2
+    while f"{candidate}_{counter}" in existing_ids:
+        counter += 1
+    return f"{candidate}_{counter}"
+
+
+def _identifier(value: str, fallback: str = "item") -> str:
+    identifier = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    identifier = re.sub(r"_+", "_", identifier)
+    if not identifier or not identifier[0].isalpha():
+        identifier = fallback
+    return identifier
 
 
 def _replace_entity_label(text: str, *, old_label: str, new_label: str) -> str:

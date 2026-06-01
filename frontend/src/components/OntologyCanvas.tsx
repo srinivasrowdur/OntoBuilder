@@ -8,12 +8,19 @@ import {
   ruleValuePhrase,
   statementStatus,
 } from "../ontology";
-import type { DraftReviewSession, NaturalLanguageStatement, OntologyDraft } from "../types";
+import type {
+  DraftReviewSession,
+  NaturalLanguageStatement,
+  OntologyDraft,
+  StatementCreatePayload,
+} from "../types";
+import { NewStatementButton, StatementComposer } from "./StatementComposer";
 
 interface OntologyCanvasProps {
   draft: OntologyDraft | null;
   session: DraftReviewSession | null;
   selectedStatementId: string | null;
+  onCreateStatement: (payload: StatementCreatePayload) => Promise<void>;
   onRenameEntity: (entityId: string, label: string) => Promise<void>;
   onSelectStatement: (statementId: string) => void;
 }
@@ -38,12 +45,14 @@ type StatementPart =
 
 export function OntologyCanvas({
   draft,
+  onCreateStatement,
   onRenameEntity,
   session,
   selectedStatementId,
   onSelectStatement,
 }: OntologyCanvasProps) {
   const { readiness, blockingIssues } = getReadiness(draft);
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [editingEntity, setEditingEntity] = useState<EditingEntity | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
   const [savingEntityId, setSavingEntityId] = useState<string | null>(null);
@@ -76,9 +85,18 @@ export function OntologyCanvas({
       <div className="domain-title">
         <span>{draft.domain}</span>
         <small>{draft.scope ?? "general ontology"}</small>
+        <NewStatementButton onClick={() => setIsComposerOpen(true)} />
       </div>
 
       <div className="statement-list">
+        {isComposerOpen ? (
+          <StatementComposer
+            draft={draft}
+            onCancel={() => setIsComposerOpen(false)}
+            onCreateStatement={onCreateStatement}
+          />
+        ) : null}
+
         {draft.statements.map((statement) => (
           <div
             className={[

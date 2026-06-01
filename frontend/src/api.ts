@@ -3,6 +3,7 @@ import type {
   DraftReviewSession,
   Identifier,
   ReviewStatus,
+  StatementCreatePayload,
 } from "./types";
 
 const API_BASE_URL =
@@ -56,6 +57,16 @@ export function reviewStatement(
   return requestJson(`/api/ontology/drafts/${draftId}/statements/${statementId}`, {
     method: "PATCH",
     body: JSON.stringify({ status, ...(text ? { text } : {}) }),
+  });
+}
+
+export function createStatement(
+  draftId: string,
+  payload: StatementCreatePayload,
+): Promise<DraftReviewSession> {
+  return requestJson<DraftReviewSession>(`/api/ontology/drafts/${draftId}/statements`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

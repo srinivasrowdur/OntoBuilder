@@ -113,3 +113,52 @@ export interface CommitResponse {
   included_statement_ids: Identifier[];
   ontology: OntologyDraft;
 }
+
+export type EntityType =
+  | "class"
+  | "role"
+  | "document"
+  | "event"
+  | "process"
+  | "state"
+  | "attribute"
+  | "value"
+  | "external_reference";
+
+export interface EntityReferencePayload {
+  id?: Identifier;
+  label?: string;
+  entity_type?: EntityType;
+  description?: string;
+}
+
+export type StatementCreatePayload =
+  | {
+      kind: "relationship";
+      subject: EntityReferencePayload;
+      predicate_label: string;
+      object: EntityReferencePayload;
+      relationship_type?: string;
+    }
+  | {
+      kind: "rule";
+      applies_to: EntityReferencePayload;
+      rule_type?: string;
+      severity: "must" | "should" | "may";
+      predicate_label: string;
+      operator:
+        | "exists"
+        | "eq"
+        | "neq"
+        | "gt"
+        | "gte"
+        | "lt"
+        | "lte"
+        | "in"
+        | "not_in"
+        | "min_count"
+        | "max_count"
+        | "pattern";
+      value?: string | number | boolean | string[] | null;
+      value_datatype?: string | null;
+    };

@@ -4,6 +4,7 @@ import {
   commitDraft,
   createDraft,
   createSampleDraft,
+  createStatement,
   getDraft,
   reviewStatement,
   updateEntityLabel,
@@ -11,7 +12,12 @@ import {
 import { OntologyCanvas } from "./components/OntologyCanvas";
 import { ReviewSidebar } from "./components/ReviewSidebar";
 import { draftForDisplay, getReviewCounts } from "./ontology";
-import type { CommitResponse, DraftReviewSession, ReviewStatus } from "./types";
+import type {
+  CommitResponse,
+  DraftReviewSession,
+  ReviewStatus,
+  StatementCreatePayload,
+} from "./types";
 
 export function App() {
   const [session, setSession] = useState<DraftReviewSession | null>(null);
@@ -130,6 +136,22 @@ export function App() {
     }
   }
 
+  async function addStatement(payload: StatementCreatePayload) {
+    if (!session) {
+      return;
+    }
+    setError(null);
+    try {
+      const nextSession = await createStatement(session.id, payload);
+      setSession(nextSession);
+      setSelectedStatementId(nextSession.statements.at(-1)?.statement.id ?? null);
+      setCommitted(null);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+      throw nextError;
+    }
+  }
+
   function downloadJson() {
     const payload = committed?.ontology ?? draft;
     if (!payload) {
@@ -161,6 +183,7 @@ export function App() {
     <main className="app-shell">
       <OntologyCanvas
         draft={draft}
+        onCreateStatement={addStatement}
         onRenameEntity={renameEntity}
         onSelectStatement={setSelectedStatementId}
         selectedStatementId={selectedReview?.statement.id ?? null}

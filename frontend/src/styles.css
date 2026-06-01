@@ -36,6 +36,7 @@ body {
 }
 
 button,
+input,
 textarea,
 select {
   font: inherit;
@@ -117,6 +118,27 @@ button:disabled {
   color: #72798c;
 }
 
+.new-statement-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  min-height: 2rem;
+  border: 1px solid rgba(91, 143, 231, 0.42);
+  border-radius: 0.42rem;
+  background: rgba(91, 143, 231, 0.12);
+  color: var(--blue-text);
+  padding: 0 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.new-statement-button:hover {
+  border-color: rgba(123, 169, 244, 0.9);
+  background: rgba(91, 143, 231, 0.2);
+  color: white;
+}
+
 .statement-list {
   display: grid;
   gap: 1.1rem;
@@ -172,6 +194,59 @@ button:disabled {
 
 .statement-row.needs_clarification .statement-status {
   background: var(--gold-text);
+}
+
+.composer-row {
+  border-color: rgba(91, 143, 231, 0.3);
+  background: rgba(91, 143, 231, 0.07);
+  cursor: default;
+}
+
+.composer-row:hover {
+  transform: none;
+}
+
+.composer-status {
+  background: var(--blue);
+}
+
+.composer-body {
+  display: grid;
+  gap: 0.78rem;
+  min-width: 0;
+}
+
+.composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.composer-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  border: 1px solid rgba(91, 143, 231, 0.4);
+  border-radius: 0.42rem;
+  background: rgba(15, 28, 51, 0.95);
+  color: #c6d6f1;
+  padding: 0 0.64rem;
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.composer-toolbar button.active,
+.composer-toolbar button:hover {
+  border-color: rgba(123, 169, 244, 0.9);
+  background: #14284a;
+  color: white;
+}
+
+.composer-toolbar .composer-action {
+  width: 2.05rem;
+  padding: 0;
 }
 
 .statement {
@@ -257,6 +332,80 @@ button:disabled {
   border-color: rgba(123, 169, 244, 0.95);
   color: white;
   background: #19345f;
+}
+
+.composer-sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.18em;
+}
+
+.entity-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.22em;
+  vertical-align: 0.05em;
+}
+
+.inline-chip-select,
+.inline-phrase-input,
+.inline-value-input,
+.inline-entity-input,
+.inline-type-select {
+  min-height: 1.58em;
+  border-radius: 0.38em;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.82em;
+  font-weight: 760;
+  line-height: 1.05;
+  outline: none;
+}
+
+.inline-chip-select {
+  max-width: 18ch;
+  border: 1px solid rgba(91, 143, 231, 0.9);
+  background: var(--blue-bg);
+  color: var(--blue-text);
+  padding: 0 0.34em;
+}
+
+.inline-chip-select.constraint {
+  border-color: rgba(215, 168, 76, 0.85);
+  background: var(--gold-bg);
+  color: var(--gold-text);
+}
+
+.inline-phrase-input,
+.inline-value-input,
+.inline-entity-input {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #070a13;
+  color: var(--text);
+  padding: 0.05em 0.38em 0.08em;
+}
+
+.inline-phrase-input {
+  width: 11.5ch;
+}
+
+.inline-value-input {
+  width: 8ch;
+}
+
+.inline-entity-input {
+  width: 14ch;
+  color: var(--blue-text);
+}
+
+.inline-type-select {
+  max-width: 13ch;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #070a13;
+  color: #cfd6e8;
+  padding: 0 0.32em;
 }
 
 .stats-row {
@@ -373,6 +522,18 @@ select {
   padding: 0 0.7rem;
   font-size: 0.82rem;
   font-weight: 650;
+}
+
+.inline-chip-select,
+.inline-type-select {
+  width: auto;
+  min-height: 1.58em;
+}
+
+.inline-phrase-input,
+.inline-value-input,
+.inline-entity-input {
+  outline: none;
 }
 
 .button-grid,
