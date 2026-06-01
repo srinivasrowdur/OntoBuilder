@@ -109,13 +109,21 @@ def build_ontology_agent(config: AgentConfig | None = None) -> Any:
 
 
 def _validate_model_runtime(model: str) -> None:
-    if not model.startswith("openai:"):
+    if model.startswith("google:"):
+        try:
+            import google.genai  # noqa: F401
+        except Exception as exc:
+            raise RuntimeError(
+                "Agno's Google Gemini model provider requires the google-genai package. "
+                "Run `python -m pip install -e '.[test]'` inside this project environment."
+            ) from exc
         return
 
-    try:
-        from openai import APIConnectionError  # noqa: F401
-    except Exception as exc:
-        raise RuntimeError(
-            "Agno's OpenAI model provider requires a current OpenAI Python client. "
-            "Run `python -m pip install -U openai` inside the environment used for this agent."
-        ) from exc
+    if model.startswith("openai:"):
+        try:
+            from openai import APIConnectionError  # noqa: F401
+        except Exception as exc:
+            raise RuntimeError(
+                "Agno's OpenAI model provider requires a current OpenAI Python client. "
+                "Run `python -m pip install -U openai` inside the environment used for this agent."
+            ) from exc

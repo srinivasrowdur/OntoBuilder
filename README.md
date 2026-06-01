@@ -61,11 +61,25 @@ npm install
 cd ..
 ```
 
-For real Agno/OpenAI-backed ontology generation, set an API key:
+For real Agno-backed ontology generation, set the API key for the provider you
+want to use:
 
 ```sh
 export OPENAI_API_KEY="..."
+export GOOGLE_API_KEY="..."
 ```
+
+Configure the active provider in `.env`:
+
+```sh
+ONTOLOGY_AGENT_PROVIDER=google
+ONTOLOGY_AGENT_GOOGLE_MODEL=google:gemini-2.5-flash
+ONTOLOGY_AGENT_OPENAI_MODEL=openai:gpt-5.2
+```
+
+Use `ONTOLOGY_AGENT_PROVIDER=openai` or `ONTOLOGY_AGENT_PROVIDER=google` to
+switch between configured providers. If `ONTOLOGY_AGENT_MODEL` is set, that
+exact Agno model string overrides the provider-specific selection.
 
 The React UI can still load the retirements sample without calling an LLM.
 
