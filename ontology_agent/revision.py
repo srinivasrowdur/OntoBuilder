@@ -212,9 +212,7 @@ def _add_rule_revision(
         predicate_label=predicate_label,
         operator=operator,
         value=value,
-        value_entity=EntityReferenceRequest(id=value_entity.entity.id)
-        if value_entity
-        else None,
+        value_entity=EntityReferenceRequest(id=value_entity.entity.id) if value_entity else None,
         statement_text=statement_text,
     )
     next_session = store.add_statement(session.id, payload)
@@ -291,7 +289,9 @@ def _scan_instruction_mentions(
             if _overlaps(start, end, occupied):
                 continue
             occupied.append((start, end))
-            resolved.append(ResolvedMention(entity=entity, token=instruction[start:end], start=start, end=end))
+            resolved.append(
+                ResolvedMention(entity=entity, token=instruction[start:end], start=start, end=end)
+            )
     return sorted(resolved, key=lambda mention: mention.start)
 
 
@@ -338,7 +338,9 @@ def _is_entity_expansion_instruction(instruction: str) -> bool:
 
 
 def _expansion_mode_from_instruction(instruction: str) -> ExpansionMode:
-    if re.search(r"\b(?:rules?|constraints?|validations?|guardrails?|polic(?:y|ies))\b", instruction, re.I):
+    if re.search(
+        r"\b(?:rules?|constraints?|validations?|guardrails?|polic(?:y|ies))\b", instruction, re.I
+    ):
         return "rules"
     if re.search(
         r"\b(?:relationships?|relations?|graph|connected|neighbou?rs?)\b|"
@@ -351,7 +353,7 @@ def _expansion_mode_from_instruction(instruction: str) -> ExpansionMode:
 
 
 def _remove_mention_token(instruction: str, mention: ResolvedMention) -> str:
-    cleaned = f"{instruction[:mention.start]}{instruction[mention.end:]}".strip()
+    cleaned = f"{instruction[: mention.start]}{instruction[mention.end :]}".strip()
     cleaned = re.sub(r"^(?:on|about|for|this entity)\b", "", cleaned, flags=re.I).strip()
     return cleaned or f"Expand {mention.entity.label}"
 
@@ -362,7 +364,7 @@ def _rule_predicate_from_instruction(
     value_entity: ResolvedMention | None,
 ) -> str:
     end = value_entity.start if value_entity else len(instruction)
-    fragment = instruction[target.end:end]
+    fragment = instruction[target.end : end]
     severity_match = re.search(r"\b(?:must|should|may)\b(?P<body>.*)$", fragment, re.I)
     body = severity_match.group("body") if severity_match else fragment
     _cardinality, body = _extract_cardinality(body)
@@ -406,7 +408,9 @@ def _infer_relationship_type(phrase: str) -> str:
         return "classification"
     if re.search(r"\b(?:consists|contains|includes|part of|comprises)\b", lowered):
         return "composition"
-    if re.search(r"\b(?:owns|holds|pays|receives|trades|issues|aum|cashflow|account|etf)\b", lowered):
+    if re.search(
+        r"\b(?:owns|holds|pays|receives|trades|issues|aum|cashflow|account|etf)\b", lowered
+    ):
         return "financial"
     if re.search(r"\b(?:approved|owned by|governed|control|compliance|satisfies)\b", lowered):
         return "governance"
@@ -437,7 +441,7 @@ def _normalize_statement_text(
 ) -> str:
     text = instruction.strip()
     for mention in sorted(mentions, key=lambda item: item.start, reverse=True):
-        text = f"{text[:mention.start]}{mention.entity.label}{text[mention.end:]}"
+        text = f"{text[: mention.start]}{mention.entity.label}{text[mention.end :]}"
     text = _compact_whitespace(text).strip(" ;,")
     first_entity = mentions[0].entity if mentions else None
     if first_entity and text.lower().startswith(first_entity.label.lower()):

@@ -187,13 +187,9 @@ class ProjectStore:
 
 def _draft_from_review_session(session: DraftReviewSession) -> OntologyDraft:
     draft_statement_ids = {statement.id for statement in session.draft.statements}
-    statements_by_id = {
-        review.statement.id: review.statement
-        for review in session.statements
-    }
+    statements_by_id = {review.statement.id: review.statement for review in session.statements}
     statements = [
-        statements_by_id.get(statement.id, statement)
-        for statement in session.draft.statements
+        statements_by_id.get(statement.id, statement) for statement in session.draft.statements
     ]
     extra_statements = [
         review.statement
@@ -342,37 +338,40 @@ def _project_markdown(project: ProjectSummary) -> str:
 
 
 def _ontology_markdown(draft: OntologyDraft, project: ProjectSummary) -> str:
-    return "\n".join(
-        [
-            _frontmatter(
-                {
-                    "id": project.id,
-                    "type": "ontology",
-                    "domain": draft.domain,
-                    "scope": draft.scope,
-                    "saved_at": project.saved_at.isoformat() if project.saved_at else None,
-                    "entities": project.entity_count,
-                    "relationships": project.relationship_count,
-                    "rules": project.rule_count,
-                    "statements": project.statement_count,
-                }
-            ),
-            f"# {draft.domain}",
-            "",
-            draft.summary,
-            "",
-            "## Map",
-            "",
-            "- [[statements|Statements]]",
-            "- [[entities|Entities]]",
-            "- [[relationships|Relationships]]",
-            "- [[rules|Rules]]",
-            "",
-            "## Scope",
-            "",
-            draft.scope or "General ontology.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                _frontmatter(
+                    {
+                        "id": project.id,
+                        "type": "ontology",
+                        "domain": draft.domain,
+                        "scope": draft.scope,
+                        "saved_at": project.saved_at.isoformat() if project.saved_at else None,
+                        "entities": project.entity_count,
+                        "relationships": project.relationship_count,
+                        "rules": project.rule_count,
+                        "statements": project.statement_count,
+                    }
+                ),
+                f"# {draft.domain}",
+                "",
+                draft.summary,
+                "",
+                "## Map",
+                "",
+                "- [[statements|Statements]]",
+                "- [[entities|Entities]]",
+                "- [[relationships|Relationships]]",
+                "- [[rules|Rules]]",
+                "",
+                "## Scope",
+                "",
+                draft.scope or "General ontology.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _statements_markdown(session: DraftReviewSession) -> str:
@@ -406,7 +405,11 @@ def _statement_object_lines(statement: NaturalLanguageStatement) -> list[str]:
 
 
 def _frontmatter(values: dict[str, object]) -> str:
-    return "---\n" + "\n".join(_frontmatter_line(key, value) for key, value in values.items()) + "\n---\n"
+    return (
+        "---\n"
+        + "\n".join(_frontmatter_line(key, value) for key, value in values.items())
+        + "\n---\n"
+    )
 
 
 def _frontmatter_line(key: str, value: object) -> str:

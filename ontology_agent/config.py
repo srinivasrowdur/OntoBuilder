@@ -69,7 +69,9 @@ def _resolve_provider() -> str:
     provider = (os.getenv("ONTOLOGY_AGENT_PROVIDER") or DEFAULT_PROVIDER).strip().lower()
     if provider not in DEFAULT_MODELS:
         supported = ", ".join(sorted(DEFAULT_MODELS))
-        raise ValueError(f"Unsupported ONTOLOGY_AGENT_PROVIDER={provider!r}. Use one of: {supported}.")
+        raise ValueError(
+            f"Unsupported ONTOLOGY_AGENT_PROVIDER={provider!r}. Use one of: {supported}."
+        )
     return provider
 
 

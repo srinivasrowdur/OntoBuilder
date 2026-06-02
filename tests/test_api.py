@@ -374,9 +374,9 @@ def test_api_revises_saved_project_with_entity_mentions(tmp_path):
 
     saved_path = project_path / "retirement-ops"
     assert "A Member owns one or more Accounts." in (saved_path / "statements.md").read_text()
-    assert "A Member must have at least one Beneficiary." in (
-        saved_path / "statements.md"
-    ).read_text()
+    assert (
+        "A Member must have at least one Beneficiary." in (saved_path / "statements.md").read_text()
+    )
 
 
 def test_api_revises_saved_project_with_entity_expansion_instruction(tmp_path):
@@ -446,18 +446,15 @@ def test_api_revises_saved_project_with_entity_expansion_instruction(tmp_path):
     assert added_statements[0]["statement"]["text"] == (
         "A Member has exactly one Member Identifier."
     )
-    assert added_statements[1]["statement"]["text"] == (
-        "A Member has exactly one Member Status."
-    )
+    assert added_statements[1]["statement"]["text"] == ("A Member has exactly one Member Status.")
     assert any(
-        entity["label"] == "Member Identifier"
-        for entity in expanded_session["draft"]["entities"]
+        entity["label"] == "Member Identifier" for entity in expanded_session["draft"]["entities"]
     )
 
     saved_path = project_path / "cricket-scoring"
-    assert "A Member has exactly one Member Identifier." in (
-        saved_path / "statements.md"
-    ).read_text()
+    assert (
+        "A Member has exactly one Member Identifier." in (saved_path / "statements.md").read_text()
+    )
     assert (saved_path / "entities" / "member-identifier.md").exists()
 
 

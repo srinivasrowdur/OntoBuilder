@@ -226,10 +226,7 @@ def _entity_expansion_request(
             _relationship_snapshot(relationship, entity_labels)
             for relationship in session.draft.relationships
         ],
-        existing_rules=[
-            _rule_snapshot(rule, entity_labels)
-            for rule in session.draft.rules
-        ],
+        existing_rules=[_rule_snapshot(rule, entity_labels) for rule in session.draft.rules],
         existing_statements=[review.statement.text for review in session.statements],
         skill_context=skill_context,
         max_relationships=0 if mode == "rules" else 8,
@@ -401,7 +398,9 @@ def _rule_snapshot(rule: Rule, entity_labels: dict[str, str]) -> RuleSnapshot:
         severity=rule.severity,
         predicate=rule.predicate,
         operator=rule.operator,
-        value=rule.value if rule.value is not None else (
+        value=rule.value
+        if rule.value is not None
+        else (
             entity_labels.get(rule.value_entity_id, rule.value_entity_id)
             if rule.value_entity_id
             else None

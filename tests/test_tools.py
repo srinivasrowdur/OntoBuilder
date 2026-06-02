@@ -126,9 +126,10 @@ def test_repair_drops_unknown_competency_question_relationships():
     repaired = repair_ontology_draft_payload(payload)
 
     assert isinstance(repaired, OntologyDraft)
-    assert "control_satisfies_compliance" not in repaired.competency_questions[
-        0
-    ].expected_relationships
+    assert (
+        "control_satisfies_compliance"
+        not in repaired.competency_questions[0].expected_relationships
+    )
 
 
 def test_skill_context_loads_planned_skills_in_order():
