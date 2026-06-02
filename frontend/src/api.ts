@@ -2,6 +2,10 @@ import type {
   CommitResponse,
   DraftReviewSession,
   Identifier,
+  MentionReference,
+  ProjectRevisionResponse,
+  ProjectSaveResponse,
+  ProjectSummary,
   ReviewStatus,
   StatementCreatePayload,
 } from "./types";
@@ -102,5 +106,51 @@ export function updateEntityLabel(
 export function commitDraft(draftId: string): Promise<CommitResponse> {
   return requestJson<CommitResponse>(`/api/ontology/drafts/${draftId}/commit`, {
     method: "POST",
+  });
+}
+
+export function listProjects(): Promise<ProjectSummary[]> {
+  return requestJson<ProjectSummary[]>("/api/projects");
+}
+
+export function createProject(
+  name: string,
+  description?: string,
+): Promise<ProjectSummary> {
+  return requestJson<ProjectSummary>("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ name, ...(description ? { description } : {}) }),
+  });
+}
+
+export function saveProject(
+  projectId: string,
+  draftId: string,
+): Promise<ProjectSaveResponse> {
+  return requestJson<ProjectSaveResponse>(`/api/projects/${projectId}/save`, {
+    method: "POST",
+    body: JSON.stringify({ draft_id: draftId }),
+  });
+}
+
+export function openProjectSession(
+  projectId: string,
+): Promise<DraftReviewSession> {
+  return requestJson<DraftReviewSession>(`/api/projects/${projectId}/session`);
+}
+
+export function reviseProject(
+  projectId: string,
+  draftId: string,
+  instruction: string,
+  mentions: MentionReference[],
+): Promise<ProjectRevisionResponse> {
+  return requestJson<ProjectRevisionResponse>(`/api/projects/${projectId}/revise`, {
+    method: "POST",
+    body: JSON.stringify({
+      draft_id: draftId,
+      instruction,
+      mentions,
+    }),
   });
 }

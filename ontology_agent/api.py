@@ -8,6 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from ontology_agent.config import ROOT, load_config
+from ontology_agent.expansion import build_entity_expansion_requests
+from ontology_agent.projects import (
+    ProjectCreateRequest,
+    ProjectSaveRequest,
+    ProjectSaveResponse,
+    ProjectStore,
+    ProjectSummary,
+)
 from ontology_agent.review import (
     BulkStatementDecisionRequest,
     CommitResponse,
@@ -17,6 +25,12 @@ from ontology_agent.review import (
     StatementCreateRequest,
     StatementDecisionRequest,
     StatementReview,
+)
+from ontology_agent.revision import (
+    EntityExpansionCallable,
+    ProjectRevisionRequest,
+    RevisionIntent,
+    revise_review_session,
 )
 from ontology_agent.schema import OntologyDraft
 from ontology_agent.service import OntologyRunResult, build_draft_from_prompt
@@ -46,16 +60,28 @@ class HealthResponse(BaseModel):
     service: str
 
 
+class ProjectRevisionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session: DraftReviewSession
+    project: ProjectSummary
+    intent: RevisionIntent
+    message: str
+
+
 BuildDraftCallable = Callable[..., OntologyRunResult]
 
 
 def create_app(
     *,
     store: ReviewStore | None = None,
+    project_store: ProjectStore | None = None,
     build_draft: BuildDraftCallable = build_draft_from_prompt,
+    expand_entity: EntityExpansionCallable | None = None,
 ) -> FastAPI:
     config = load_config()
     review_store = store or ReviewStore(config.review_path)
+    projects = project_store or ProjectStore(config.projects_path)
     app = FastAPI(
         title="Ontology Review API",
         description=(
@@ -80,6 +106,109 @@ def create_app(
     @app.get("/api/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
         return HealthResponse(status="ok", service="ontology-review-api")
+
+    @app.get("/api/projects", response_model=list[ProjectSummary], tags=["projects"])
+    def list_projects() -> list[ProjectSummary]:
+        return projects.list_projects()
+
+    @app.post("/api/projects", response_model=ProjectSummary, tags=["projects"])
+    def create_project(request: ProjectCreateRequest) -> ProjectSummary:
+        return projects.create_project(request)
+
+    @app.get(
+        "/api/projects/{project_id}",
+        response_model=ProjectSummary,
+        tags=["projects"],
+    )
+    def get_project(project_id: str) -> ProjectSummary:
+        try:
+            return projects.get_project(project_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Project not found: {project_id}") from exc
+
+    @app.post(
+        "/api/projects/{project_id}/save",
+        response_model=ProjectSaveResponse,
+        tags=["projects"],
+    )
+    def save_project(
+        project_id: str,
+        request: ProjectSaveRequest,
+    ) -> ProjectSaveResponse:
+        session = _get_session_or_404(review_store, request.draft_id)
+        try:
+            return projects.save_session(project_id, session)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Project not found: {project_id}") from exc
+
+    @app.get(
+        "/api/projects/{project_id}/session",
+        response_model=DraftReviewSession,
+        tags=["projects"],
+    )
+    def open_project_session(project_id: str) -> DraftReviewSession:
+        try:
+            session = projects.load_session(project_id)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Saved project session not found: {project_id}",
+            ) from exc
+        review_store.save(session)
+        return session
+
+    @app.post(
+        "/api/projects/{project_id}/revise",
+        response_model=ProjectRevisionResponse,
+        tags=["projects"],
+    )
+    def revise_project(
+        project_id: str,
+        request: ProjectRevisionRequest,
+    ) -> ProjectRevisionResponse:
+        try:
+            project = projects.get_project(project_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Project not found: {project_id}") from exc
+
+        if project.draft_id and project.draft_id != request.draft_id:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "The active draft does not match this project. "
+                    "Open the project again before revising it."
+                ),
+            )
+
+        try:
+            result = revise_review_session(
+                review_store,
+                request,
+                expand_entity=expand_entity
+                or (
+                    lambda session, entity, instruction, mode: build_entity_expansion_requests(
+                        session,
+                        entity,
+                        instruction,
+                        mode=mode,
+                        config=config,
+                    )
+                ),
+            )
+            saved = projects.save_session(project_id, result.session)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=f"Draft not found: {request.draft_id}") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Project revision failed: {exc}") from exc
+
+        return ProjectRevisionResponse(
+            session=result.session,
+            project=saved.project,
+            intent=result.intent,
+            message=result.message,
+        )
 
     @app.post(
         "/api/ontology/drafts",

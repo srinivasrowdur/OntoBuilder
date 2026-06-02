@@ -3,10 +3,15 @@ import {
   bulkReview,
   commitDraft,
   createDraft,
+  createProject,
   createSampleDraft,
   createStatement,
   getDraft,
+  listProjects,
+  openProjectSession,
   reviewStatement,
+  reviseProject,
+  saveProject,
   updateEntityLabel,
 } from "./api";
 import { OntologyCanvas } from "./components/OntologyCanvas";
@@ -15,19 +20,37 @@ import { draftForDisplay, getReviewCounts } from "./ontology";
 import type {
   CommitResponse,
   DraftReviewSession,
+  Entity,
+  MentionReference,
+  OntologyDraft,
+  ProjectSummary,
   ReviewStatus,
   StatementCreatePayload,
 } from "./types";
 
+type InspectorMode = "entity" | "statement";
+
 export function App() {
   const [session, setSession] = useState<DraftReviewSession | null>(null);
   const [selectedStatementId, setSelectedStatementId] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [inspectorMode, setInspectorMode] = useState<InspectorMode>("statement");
+  const [entityLabelPreviews, setEntityLabelPreviews] = useState<Record<string, string>>({});
+  const [statementTextPreviews, setStatementTextPreviews] = useState<Record<string, string>>({});
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [committed, setCommitted] = useState<CommitResponse | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectSaving, setProjectSaving] = useState(false);
+  const [projectMessage, setProjectMessage] = useState<string | null>(null);
 
-  const draft = useMemo(() => draftForDisplay(session), [session]);
+  const baseDraft = useMemo(() => draftForDisplay(session), [session]);
+  const draft = useMemo(
+    () => applyPreviewOverrides(baseDraft, entityLabelPreviews, statementTextPreviews),
+    [baseDraft, entityLabelPreviews, statementTextPreviews],
+  );
   const selectedReview = useMemo(() => {
     if (!session) {
       return null;
@@ -38,19 +61,45 @@ export function App() {
       null;
     return selected;
   }, [selectedStatementId, session]);
+  const selectedEntity = useMemo(() => {
+    if (!draft) {
+      return null;
+    }
+    return draft.entities.find((entity) => entity.id === selectedEntityId) ?? draft.entities[0] ?? null;
+  }, [draft, selectedEntityId]);
+  const selectedSavedEntity = useMemo(() => {
+    if (!baseDraft) {
+      return null;
+    }
+    return baseDraft.entities.find((entity) => entity.id === selectedEntityId) ?? baseDraft.entities[0] ?? null;
+  }, [baseDraft, selectedEntityId]);
 
   useEffect(() => {
-    if (!session) {
-      void loadSample();
-    }
+    void refreshProjects();
   }, []);
+
+  useEffect(() => {
+    if (!draft) {
+      setSelectedEntityId(null);
+      return;
+    }
+
+    setSelectedEntityId((currentId) => {
+      if (currentId && draft.entities.some((entity) => entity.id === currentId)) {
+        return currentId;
+      }
+      return selectedReview?.statement.subject_entity_id ?? draft.entities[0]?.id ?? null;
+    });
+  }, [draft, selectedReview?.statement.subject_entity_id]);
 
   async function loadSample() {
     setLoading(true);
     setError(null);
+    setProjectMessage(null);
     try {
       const nextSession = await createSampleDraft();
       setReviewSession(nextSession);
+      setSelectedProjectId(null);
       setCommitted(null);
     } catch (nextError) {
       setError(errorMessage(nextError));
@@ -60,14 +109,70 @@ export function App() {
   }
 
   async function generateDraft() {
-    if (!prompt.trim()) {
+    const requestText = prompt.trim();
+    if (!requestText) {
       return;
     }
     setLoading(true);
     setError(null);
+    setProjectMessage(null);
     try {
-      const nextSession = await createDraft(prompt.trim());
+      const nextSession = await createDraft(requestText);
       setReviewSession(nextSession);
+      setCommitted(null);
+      setPrompt("");
+      if (selectedProjectId) {
+        const response = await saveProject(selectedProjectId, nextSession.id);
+        setProjects((current) => upsertProject(current, response.project));
+        setProjectMessage(`Project updated: ${response.project.name}`);
+      } else {
+        await createAndSaveProjectForSession(nextSession, requestText);
+      }
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPrompt() {
+    if (selectedProjectId && session) {
+      await reviseActiveProject();
+      return;
+    }
+    await generateDraft();
+  }
+
+  async function reviseActiveProject() {
+    if (!session || !selectedProjectId) {
+      return;
+    }
+    const instruction = prompt.trim();
+    if (!instruction) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setProjectMessage(null);
+    try {
+      const mentions = extractPromptMentions(instruction, session.draft.entities);
+      const response = await reviseProject(
+        selectedProjectId,
+        session.id,
+        instruction,
+        mentions,
+      );
+      setReviewSession(response.session);
+      if (response.intent === "add_relationship" || response.intent === "add_rule") {
+        setSelectedStatementId(response.session.statements.at(-1)?.statement.id ?? null);
+      }
+      if (response.intent === "expand_entity" && mentions[0]?.id) {
+        setSelectedEntityId(mentions[0].id);
+        setInspectorMode("entity");
+      }
+      setProjects((current) => upsertProject(current, response.project));
+      setSelectedProjectId(response.project.id);
+      setProjectMessage(response.message);
       setCommitted(null);
       setPrompt("");
     } catch (nextError) {
@@ -77,17 +182,19 @@ export function App() {
     }
   }
 
-  async function applyDecision(status: ReviewStatus, text?: string) {
-    if (!session || !selectedReview) {
+  async function updateStatementReview(statementId: string, status: ReviewStatus, text?: string) {
+    if (!session) {
       return;
     }
     setError(null);
     try {
-      await reviewStatement(session.id, selectedReview.statement.id, status, text);
+      await reviewStatement(session.id, statementId, status, text);
       setReviewSession(await getDraft(session.id));
+      setStatementTextPreviews((current) => omitKey(current, statementId));
       setCommitted(null);
     } catch (nextError) {
       setError(errorMessage(nextError));
+      throw nextError;
     }
   }
 
@@ -129,6 +236,7 @@ export function App() {
     setError(null);
     try {
       setReviewSession(await updateEntityLabel(session.id, entityId, label));
+      setEntityLabelPreviews((current) => omitKey(current, entityId));
       setCommitted(null);
     } catch (nextError) {
       setError(errorMessage(nextError));
@@ -152,6 +260,128 @@ export function App() {
     }
   }
 
+  async function refreshProjects() {
+    try {
+      const nextProjects = await listProjects();
+      setProjects(nextProjects);
+      setSelectedProjectId((currentId) => {
+        if (currentId && nextProjects.some((project) => project.id === currentId)) {
+          return currentId;
+        }
+        return null;
+      });
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  async function createWorkspaceProject(name: string, description?: string) {
+    setProjectSaving(true);
+    setError(null);
+    setProjectMessage(null);
+    try {
+      const project = await createProject(name, description);
+      setProjects((current) => upsertProject(current, project));
+      setSelectedProjectId(project.id);
+      setReviewSession(null);
+      setCommitted(null);
+      setPrompt("");
+      setProjectMessage(`Project created: ${project.name}`);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+      throw nextError;
+    } finally {
+      setProjectSaving(false);
+    }
+  }
+
+  async function saveCurrentOntologyToProject() {
+    if (!session || !selectedProjectId) {
+      return;
+    }
+    setProjectSaving(true);
+    setError(null);
+    setProjectMessage(null);
+    try {
+      const response = await saveProject(selectedProjectId, session.id);
+      setProjects((current) => upsertProject(current, response.project));
+      setSelectedProjectId(response.project.id);
+      setProjectMessage(`Saved ${response.project.name}`);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+      throw nextError;
+    } finally {
+      setProjectSaving(false);
+    }
+  }
+
+  async function openWorkspaceProject(projectId: string) {
+    const project = projects.find((candidate) => candidate.id === projectId);
+    setSelectedProjectId(projectId);
+    setProjectMessage(null);
+    if (!project?.draft_id) {
+      setReviewSession(null);
+      setCommitted(null);
+      setPrompt("");
+      if (project) {
+        setProjectMessage(`Opened ${project.name}`);
+      }
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const nextSession = await openProjectSession(projectId);
+      setReviewSession(nextSession);
+      setCommitted(null);
+      setProjectMessage(`Opened ${project.name}`);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+      throw nextError;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createAndSaveProjectForSession(
+    nextSession: DraftReviewSession,
+    description?: string,
+  ) {
+    setProjectSaving(true);
+    const projectName = projectNameFromDraft(nextSession.draft);
+    try {
+      const project = await createProject(projectName, description);
+      const response = await saveProject(project.id, nextSession.id);
+      setProjects((current) => upsertProject(current, response.project));
+      setSelectedProjectId(response.project.id);
+      setProjectMessage(`Project created: ${response.project.name}`);
+    } finally {
+      setProjectSaving(false);
+    }
+  }
+
+  function selectStatement(statementId: string) {
+    setSelectedStatementId(statementId);
+    setInspectorMode("statement");
+    const statement = draft?.statements.find((candidate) => candidate.id === statementId);
+    if (statement?.subject_entity_id) {
+      setSelectedEntityId(statement.subject_entity_id);
+    }
+  }
+
+  function selectEntity(entityId: Entity["id"]) {
+    setSelectedEntityId(entityId);
+    setInspectorMode("entity");
+  }
+
+  function previewEntityLabel(entityId: string, label: string | null) {
+    setEntityLabelPreviews((current) => setPreviewValue(current, entityId, label));
+  }
+
+  function previewStatementText(statementId: string, text: string | null) {
+    setStatementTextPreviews((current) => setPreviewValue(current, statementId, text));
+  }
+
   function downloadJson() {
     const payload = committed?.ontology ?? draft;
     if (!payload) {
@@ -168,8 +398,16 @@ export function App() {
     URL.revokeObjectURL(url);
   }
 
-  function setReviewSession(nextSession: DraftReviewSession) {
+  function setReviewSession(nextSession: DraftReviewSession | null) {
     setSession(nextSession);
+    setEntityLabelPreviews({});
+    setStatementTextPreviews({});
+    if (!nextSession) {
+      setSelectedEntityId(null);
+      setSelectedStatementId(null);
+      setInspectorMode("statement");
+      return;
+    }
     setSelectedStatementId((currentId) => {
       const statementIds = nextSession.statements.map((review) => review.statement.id);
       return currentId && statementIds.includes(currentId) ? currentId : statementIds[0] ?? null;
@@ -182,33 +420,44 @@ export function App() {
   return (
     <main className="app-shell">
       <OntologyCanvas
-        draft={draft}
-        onCreateStatement={addStatement}
-        onRenameEntity={renameEntity}
-        onSelectStatement={setSelectedStatementId}
-        selectedStatementId={selectedReview?.statement.id ?? null}
-        session={session}
-      />
-      <ReviewSidebar
         canCommit={acceptedCount > 0}
-        committed={committed}
+        draft={draft}
         error={error}
         loading={loading}
         onAcceptAll={acceptAllPending}
         onCommit={commitAccepted}
-        onDecision={applyDecision}
+        onCreateStatement={addStatement}
         onDownload={downloadJson}
-        onGenerate={generateDraft}
+        onGenerate={submitPrompt}
         onLoadSample={loadSample}
         onPromptChange={setPrompt}
-        onSelectStatement={setSelectedStatementId}
+        onProjectCreate={createWorkspaceProject}
+        onProjectOpen={openWorkspaceProject}
+        onProjectSave={saveCurrentOntologyToProject}
+        onSelectEntity={selectEntity}
+        onSelectStatement={selectStatement}
         prompt={prompt}
-        selectedReview={selectedReview}
+        projectMessage={projectMessage}
+        projectSaving={projectSaving}
+        projects={projects}
+        selectedEntityId={selectedEntity?.id ?? null}
+        selectedProjectId={selectedProjectId}
+        selectedStatementId={selectedReview?.statement.id ?? null}
         session={session}
       />
-      <div className="commit-meter" aria-live="polite">
-        {acceptedCount} of {session?.statements.length ?? 0} statements accepted
-      </div>
+      <ReviewSidebar
+        draft={draft}
+        inspectorMode={inspectorMode}
+        onPreviewEntityLabel={previewEntityLabel}
+        onPreviewStatementText={previewStatementText}
+        onRenameEntity={renameEntity}
+        onReviewStatement={updateStatementReview}
+        onSelectEntity={selectEntity}
+        onSelectStatement={selectStatement}
+        selectedEntity={selectedEntity}
+        selectedSavedEntity={selectedSavedEntity}
+        selectedReview={selectedReview}
+      />
     </main>
   );
 }
@@ -219,4 +468,165 @@ function errorMessage(error: unknown) {
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ontology";
+}
+
+function projectNameFromDraft(draft: OntologyDraft) {
+  return titleCaseWords(draft.domain || draft.scope || "Ontology Project");
+}
+
+function titleCaseWords(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => (word.length <= 3 && word === word.toUpperCase() ? word : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ")
+    .slice(0, 80);
+}
+
+function upsertProject(projects: ProjectSummary[], nextProject: ProjectSummary) {
+  const existing = projects.filter((project) => project.id !== nextProject.id);
+  return [nextProject, ...existing].sort((left, right) =>
+    right.updated_at.localeCompare(left.updated_at),
+  );
+}
+
+function extractPromptMentions(
+  instruction: string,
+  entities: Entity[],
+): MentionReference[] {
+  const matches: Array<{
+    entity: Entity;
+    end: number;
+    start: number;
+    token: string;
+  }> = [];
+
+  for (const entity of entities) {
+    const tokens = [`@${entity.label}`, `@${entity.id}`, ...entity.aliases.map((alias) => `@${alias}`)];
+    for (const token of tokens.filter(Boolean)) {
+      const pattern = new RegExp(escapeRegExp(token), "gi");
+      for (const match of instruction.matchAll(pattern)) {
+        const start = match.index ?? -1;
+        if (start < 0) {
+          continue;
+        }
+        matches.push({
+          entity,
+          end: start + match[0].length,
+          start,
+          token: match[0],
+        });
+      }
+    }
+  }
+
+  const selected: typeof matches = [];
+  for (const match of matches.sort((left, right) => {
+    const startDelta = left.start - right.start;
+    return startDelta || right.token.length - left.token.length;
+  })) {
+    if (selected.some((item) => !(match.end <= item.start || match.start >= item.end))) {
+      continue;
+    }
+    selected.push(match);
+  }
+
+  return selected.map((match) => ({
+    id: match.entity.id,
+    label: match.entity.label,
+    token: match.token,
+  }));
+}
+
+function applyPreviewOverrides(
+  draft: OntologyDraft | null,
+  entityLabelPreviews: Record<string, string>,
+  statementTextPreviews: Record<string, string>,
+): OntologyDraft | null {
+  if (!draft) {
+    return null;
+  }
+
+  const entityEntries = Object.entries(entityLabelPreviews).filter(([, label]) => label.trim());
+  const statementEntries = Object.entries(statementTextPreviews).filter(([, text]) => text.trim());
+  if (entityEntries.length === 0 && statementEntries.length === 0) {
+    return draft;
+  }
+
+  let nextStatements = draft.statements;
+  let nextRules = draft.rules;
+  const nextEntities = draft.entities.map((entity) => {
+    const nextLabel = entityLabelPreviews[entity.id]?.trim();
+    return nextLabel ? { ...entity, label: nextLabel } : entity;
+  });
+
+  for (const [entityId, nextLabel] of entityEntries) {
+    const entity = draft.entities.find((candidate) => candidate.id === entityId);
+    if (!entity || entity.label === nextLabel) {
+      continue;
+    }
+    nextStatements = nextStatements.map((statement) => ({
+      ...statement,
+      text: replaceEntityLabel(statement.text, entity.label, nextLabel),
+    }));
+    nextRules = nextRules.map((rule) => ({
+      ...rule,
+      text: replaceEntityLabel(rule.text, entity.label, nextLabel),
+    }));
+  }
+
+  if (statementEntries.length > 0) {
+    const statementPreviewMap = new Map(statementEntries);
+    nextStatements = nextStatements.map((statement) => {
+      const nextText = statementPreviewMap.get(statement.id)?.trim();
+      return nextText ? { ...statement, text: nextText } : statement;
+    });
+  }
+
+  return {
+    ...draft,
+    entities: nextEntities,
+    rules: nextRules,
+    statements: nextStatements,
+  };
+}
+
+function setPreviewValue(
+  current: Record<string, string>,
+  id: string,
+  value: string | null,
+) {
+  if (value === null) {
+    return omitKey(current, id);
+  }
+  return { ...current, [id]: value };
+}
+
+function omitKey(current: Record<string, string>, id: string) {
+  if (!(id in current)) {
+    return current;
+  }
+  const { [id]: _removed, ...next } = current;
+  return next;
+}
+
+function replaceEntityLabel(text: string, oldLabel: string, newLabel: string) {
+  let nextText = text;
+  if (!oldLabel.toLowerCase().endsWith("s")) {
+    nextText = nextText.replace(
+      new RegExp(`\\b${escapeRegExp(oldLabel)}s\\b`, "gi"),
+      pluralizeLabel(newLabel),
+    );
+  }
+  return nextText.replace(new RegExp(`\\b${escapeRegExp(oldLabel)}\\b`, "gi"), newLabel);
+}
+
+function pluralizeLabel(label: string) {
+  return label.toLowerCase().endsWith("s") ? label : `${label}s`;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

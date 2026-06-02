@@ -2,6 +2,7 @@
 .env
 .venv/
 tmp/
+projects/
 *.egg-info/
 __pycache__/
 *.pyc

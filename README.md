@@ -20,6 +20,9 @@ starter kit, which remains available under the root ontology files.
 - Lets users compose new relationship statements from existing or new entities.
 - Lets users compose rule statements with severity, property, operator, and value.
 - Commits accepted/edited statements into a clean, exportable ontology JSON.
+- Saves ontologies into local project folders as Markdown plus JSON.
+- Revises an opened project in-place from the bottom prompt, with `@Entity`
+  mentions resolved against the active ontology.
 - Keeps the frontend as review-state UI and the backend as the source of truth.
 
 ## Architecture
@@ -30,6 +33,7 @@ React/Vite UI
     -> Agno ontology agent
     -> Pydantic ontology schema
     -> Review session store
+    -> Project folder store
     -> JSON export
 ```
 
@@ -37,6 +41,7 @@ Key folders and files:
 
 - `frontend/`: React + TypeScript review UI.
 - `ontology_agent/`: Agno-oriented ontology agent, schemas, tools, API, and review store.
+- `projects/`: optional local folder-backed knowledge base for saved ontology projects.
 - `ontology_agent/skills/`: modular skills for scope control, concept gathering,
   relationship design, rule design, statement rendering, validation, and JSON export.
 - `examples/retirements-ontology-draft.json`: sample draft used by the UI.
@@ -81,6 +86,13 @@ Use `ONTOLOGY_AGENT_PROVIDER=openai` or `ONTOLOGY_AGENT_PROVIDER=google` to
 switch between configured providers. If `ONTOLOGY_AGENT_MODEL` is set, that
 exact Agno model string overrides the provider-specific selection.
 
+Project folders are saved to `projects/` by default. To store them somewhere
+else, set:
+
+```sh
+ONTOLOGY_AGENT_PROJECTS_PATH="/path/to/ontology-projects"
+```
+
 The React UI can still load the retirements sample without calling an LLM.
 
 ## Run The App
@@ -111,8 +123,59 @@ Open:
 3. Click an entity chip to rename it inline, then save or discard.
 4. Click `+ Statement` to add a new relationship or rule statement.
 5. Approve, reject, clarify, or edit statements in the right review panel.
-6. Click `Commit accepted` to build the final ontology from accepted/edited statements.
-7. Download the resulting JSON.
+6. Open the hamburger project drawer to create, open, or save a project.
+7. With a project open, use the bottom prompt for scoped edits such as
+   `@Member owns one or more @Account` or `rename @Member to Plan Member`.
+8. Click `Commit accepted` to build the final ontology from accepted/edited statements.
+9. Download the resulting JSON.
+
+## Project Folders
+
+Projects are file-first and are intended to work like a local second brain. One
+project contains one ontology. A saved project uses Markdown for human-readable
+notes and JSON for exact app reloads:
+
+```text
+projects/
+  vanguard-financial-advisory/
+    project.md
+    project.json
+    ontology.md
+    ontology.json
+    review-session.json
+    statements.md
+    accepted-ontology.json
+    entities/
+      advisory-partner.md
+    relationships/
+      distributes.md
+    rules/
+      issue-remediation-rule.md
+```
+
+The Markdown files include frontmatter and wiki-style links such as
+`[[member]]`, so the folder can be opened in tools like Obsidian or kept under
+Git. The JSON files remain the app's exact machine-readable representation.
+
+## Project-Scoped Revisions
+
+Once a project is open, the bottom prompt acts on that ontology instead of
+starting over. The UI sends `@Entity` mentions with stable entity IDs, and the
+backend currently supports deterministic edits for:
+
+- renaming one entity, for example `rename @Member to Plan Member`
+- adding a relationship between two entities, for example
+  `@Member owns one or more @Account`
+- adding a rule for one entity, optionally referencing another entity, for
+  example `@Issue must have at least one @Remediation Plan`
+- expanding one entity through the ontology expansion agent with additional
+  candidate relationships, entities, and rules, for example
+  `@Cricket Match Expand on this entity to cover more`
+- aiming that same agent at a narrower expansion mode, for example
+  `@Cricket Match expand relationships` or `@Cricket Match expand rules`
+
+Every successful project revision updates the review session and immediately
+rewrites the Markdown/JSON project folder.
 
 ## Statement Composer
 
@@ -151,6 +214,12 @@ This creates:
 Core routes:
 
 - `GET /api/health`
+- `GET /api/projects`
+- `POST /api/projects`
+- `GET /api/projects/{project_id}`
+- `POST /api/projects/{project_id}/save`
+- `GET /api/projects/{project_id}/session`
+- `POST /api/projects/{project_id}/revise`
 - `POST /api/ontology/drafts`
 - `POST /api/ontology/drafts/import`
 - `POST /api/ontology/drafts/samples/retirements`

@@ -9,6 +9,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ontology_agent.schema import (
+    Cardinality,
     Entity,
     Identifier,
     NaturalLanguageStatement,
@@ -157,6 +158,7 @@ class StatementCreateRequest(BaseModel):
     object: EntityReferenceRequest | None = None
     predicate_label: str | None = Field(default=None, min_length=1)
     relationship_type: RelationshipType = "association"
+    cardinality: Cardinality | None = None
     applies_to: EntityReferenceRequest | None = None
     rule_type: RuleType = "validation"
     severity: Literal["must", "should", "may"] = "must"
@@ -164,6 +166,7 @@ class StatementCreateRequest(BaseModel):
     value: str | int | float | bool | list[str] | None = None
     value_entity: EntityReferenceRequest | None = None
     value_datatype: str | None = None
+    statement_text: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_statement(self) -> "StatementCreateRequest":
@@ -451,13 +454,21 @@ def _add_relationship_statement(
         label=request.predicate_label.strip(),
         object_entity_id=object_entity.id,
         relationship_type=request.relationship_type,
+        cardinality=request.cardinality,
         description=(f"{subject.label} {request.predicate_label.strip()} {object_entity.label}."),
         confidence=0.7,
     )
     statement = NaturalLanguageStatement(
         id=_unique_id(f"statement_{relationship_id}", {item.id for item in draft.statements}),
         kind="relationship",
-        text=_relationship_statement_text(subject.label, relationship.label, object_entity.label),
+        text=request.statement_text.strip()
+        if request.statement_text
+        else _relationship_statement_text(
+            subject.label,
+            relationship.label,
+            object_entity.label,
+            request.cardinality,
+        ),
         subject_entity_id=subject.id,
         predicate=relationship.label,
         object_entity_id=object_entity.id,
@@ -502,13 +513,17 @@ def _add_rule_statement(
         f"{applies_to.id}_{predicate}_{request.operator}_{value_id_part}",
         rule_ids,
     )
-    text = _rule_statement_text(
-        entity_label=applies_to.label,
-        severity=request.severity,
-        predicate_label=request.predicate_label.strip(),
-        operator=request.operator,
-        value=request.value,
-        value_entity_label=value_entity.label if value_entity else None,
+    text = (
+        request.statement_text.strip()
+        if request.statement_text
+        else _rule_statement_text(
+            entity_label=applies_to.label,
+            severity=request.severity,
+            predicate_label=request.predicate_label.strip(),
+            operator=request.operator,
+            value=request.value,
+            value_entity_label=value_entity.label if value_entity else None,
+        )
     )
     rule = Rule(
         id=rule_id,
@@ -682,11 +697,24 @@ def _relationship_statement_text(
     subject_label: str,
     predicate_label: str,
     object_label: str,
+    cardinality: Cardinality | None = None,
 ) -> str:
+    if cardinality and cardinality.text:
+        object_phrase = _cardinality_object_phrase(object_label, cardinality.text)
+        return (
+            f"{_article(subject_label).capitalize()} {subject_label} "
+            f"{predicate_label} {cardinality.text} {object_phrase}."
+        )
     return (
         f"{_article(subject_label).capitalize()} {subject_label} "
         f"{predicate_label} {_article(object_label)} {object_label}."
     )
+
+
+def _cardinality_object_phrase(object_label: str, cardinality_text: str) -> str:
+    if re.search(r"\b(?:zero|one|many)\s+or\s+more\b|\bat\s+least\b", cardinality_text, re.I):
+        return _pluralize_label(object_label)
+    return object_label
 
 
 def _rule_statement_text(
