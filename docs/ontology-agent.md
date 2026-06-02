@@ -50,15 +50,13 @@ python -m ontology_agent.cli build "insurance claims" --scope "policy administra
 
 All commands emit JSON to stdout.
 
-Run the visual UI:
+Run the FastAPI review API:
 
 ```sh
-python -m streamlit run streamlit_app.py
+python -m uvicorn ontology_agent.api:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The UI renders ontology statements on the left and keeps the chat prompt/history on the right.
-
-Run the React review UI:
+Run the React ontology workspace:
 
 ```sh
 cd frontend
@@ -66,16 +64,10 @@ npm install
 npm run dev -- --port 5173
 ```
 
-Open `http://localhost:5173`. This is the richer UI layer for statement review:
-the backend remains Python/FastAPI/Agno, while the frontend owns review
-selection state, inline entity renaming, statement composition, statement
-editing, bulk approval, export, and commit actions.
-
-Run the review API:
-
-```sh
-python -m uvicorn ontology_agent.api:app --reload --port 8000
-```
+Open `http://localhost:5173`. The backend remains Python/FastAPI/Agno, while
+the frontend owns review selection state, inspector state, entity renaming,
+statement composition, statement editing, graph exploration, bulk approval,
+export, and commit actions.
 
 The API is the backend boundary for richer frontends. It exposes statement-level
 review state so the frontend can let users accept, edit, reject, or flag

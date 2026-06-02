@@ -268,24 +268,14 @@ python -m ontology_agent.cli schema
 python -m ontology_agent.cli skills
 ```
 
-## Legacy Streamlit UI
-
-A simple Streamlit UI is still available:
-
-```sh
-python -m streamlit run streamlit_app.py
-```
-
-The React UI is the preferred interface for richer review and editing.
-
 ## Test And Validate
 
 Run Python tests and linting:
 
 ```sh
 python -m pytest -q
-python -m ruff check ontology_agent tests streamlit_app.py
-python -m ruff format --check ontology_agent tests streamlit_app.py
+python -m ruff check ontology_agent tests
+python -m ruff format --check ontology_agent tests
 ```
 
 Build the React frontend:
