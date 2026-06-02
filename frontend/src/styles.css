@@ -1203,32 +1203,6 @@ select {
   justify-self: start;
 }
 
-.owl-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.owl-actions button {
-  min-height: 2.22rem;
-}
-
-.owl-preview {
-  max-height: 12rem;
-  margin: 0;
-  overflow: auto;
-  border: 1px solid rgba(214, 224, 244, 0.1);
-  border-radius: 0.42rem;
-  background: #07090e;
-  color: #d6deef;
-  padding: 0.72rem;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 0.69rem;
-  line-height: 1.48;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .status-pill {
   justify-self: start;
   display: inline-flex;

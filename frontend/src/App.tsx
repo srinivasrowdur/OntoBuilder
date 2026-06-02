@@ -236,24 +236,9 @@ export function App() {
         session={session}
       />
       <ReviewSidebar
-        canCommit={acceptedCount > 0}
-        committed={committed}
-        error={error}
-        loading={loading}
-        onAcceptAll={acceptAllPending}
-        onCommit={commitAccepted}
-        onDecision={applyDecision}
-        onDownload={downloadJson}
-        onGenerate={generateDraft}
-        onLoadSample={loadSample}
-        onPromptChange={setPrompt}
         onSelectEntity={selectEntity}
-        onSelectStatement={selectStatement}
-        prompt={prompt}
         draft={draft}
         selectedEntity={selectedEntity}
-        selectedReview={selectedReview}
-        session={session}
       />
     </main>
   );

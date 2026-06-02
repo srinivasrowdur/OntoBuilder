@@ -1,81 +1,23 @@
 import {
-  Braces,
-  Check,
-  Copy,
-  Download,
-  FileJson,
   GitBranch,
-  HelpCircle,
   Info,
-  Loader2,
   PanelRight,
-  RotateCcw,
-  Sparkles,
   Tags,
-  Upload,
-  X,
 } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
-import type {
-  CommitResponse,
-  DraftReviewSession,
-  Entity,
-  OntologyDraft,
-  Relationship,
-  ReviewStatus,
-  StatementReview,
-} from "../types";
-import { getReviewCounts, STATUS_LABELS } from "../ontology";
+import type { ReactNode } from "react";
+import type { Entity, OntologyDraft, Relationship } from "../types";
 
 interface ReviewSidebarProps {
   draft: OntologyDraft | null;
-  session: DraftReviewSession | null;
   selectedEntity: Entity | null;
-  selectedReview: StatementReview | null;
-  prompt: string;
-  loading: boolean;
-  error: string | null;
-  committed: CommitResponse | null;
-  canCommit: boolean;
-  onPromptChange: (prompt: string) => void;
-  onGenerate: () => void;
-  onLoadSample: () => void;
   onSelectEntity: (entityId: string) => void;
-  onSelectStatement: (statementId: string) => void;
-  onDecision: (status: ReviewStatus, text?: string) => void;
-  onAcceptAll: () => void;
-  onCommit: () => void;
-  onDownload: () => void;
 }
 
 export function ReviewSidebar({
   draft,
-  session,
   selectedEntity,
-  selectedReview,
-  prompt,
-  loading,
-  error,
-  committed,
-  canCommit,
-  onPromptChange,
-  onGenerate,
-  onLoadSample,
   onSelectEntity,
-  onSelectStatement,
-  onDecision,
-  onAcceptAll,
-  onCommit,
-  onDownload,
 }: ReviewSidebarProps) {
-  const counts = session ? getReviewCounts(session.statements) : null;
-  const acceptedCount = counts ? counts.accepted + counts.edited : 0;
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    onGenerate();
-  }
-
   return (
     <aside className="sidebar" aria-label="Ontology review controls">
       <section className="panel inspector-title">
@@ -106,7 +48,7 @@ function EntityInspector({
           <PanelRight size={16} />
           <span>Entity properties</span>
         </div>
-        <p className="inspector-empty">Select an entity from the text or graph to inspect OWL-ready metadata.</p>
+        <p className="inspector-empty">Select an entity from the text or graph to inspect its structured metadata.</p>
       </section>
     );
   }
@@ -143,7 +85,6 @@ function EntityInspector({
           ),
       ),
   );
-  const owlFragment = buildEntityOwlFragment(draft, entity, entityById);
   const iri = entityIri(draft, entity);
   const parentEntity = entity.parent_entity_id ? entityById.get(entity.parent_entity_id) : null;
 
@@ -240,20 +181,6 @@ function EntityInspector({
           </div>
         </InspectorSection>
       ) : null}
-
-      <InspectorSection icon={<Braces size={15} />} title="OWL extraction">
-        <div className="owl-actions">
-          <button onClick={() => void navigator.clipboard.writeText(owlFragment)} type="button">
-            <Copy size={15} />
-            Copy OWL
-          </button>
-          <button onClick={() => downloadOwlFragment(draft, entity, owlFragment)} type="button">
-            <Download size={15} />
-            Download
-          </button>
-        </div>
-        <pre className="owl-preview">{owlFragment}</pre>
-      </InspectorSection>
     </section>
   );
 }
@@ -336,39 +263,6 @@ function RelationshipList({
   );
 }
 
-function buildEntityOwlFragment(
-  draft: OntologyDraft,
-  entity: Entity,
-  entityById: Map<string, Entity>,
-) {
-  const aliases = entity.aliases.map((alias) => `skos:altLabel "${ttlString(alias)}"`);
-  const parentEntity = entity.parent_entity_id ? entityById.get(entity.parent_entity_id) : null;
-  const predicates = [
-    `a ${owlTypeForEntity(entity)}`,
-    `rdfs:label "${ttlString(entity.label)}"`,
-    entity.description ? `rdfs:comment "${ttlString(entity.description)}"` : null,
-    parentEntity ? `rdfs:subClassOf :${entityLocalName(parentEntity)}` : null,
-    ...aliases,
-  ].filter((predicate): predicate is string => Boolean(predicate));
-
-  const body = predicates
-    .map((predicate, index) => {
-      const prefix = index === 0 ? "" : "  ";
-      const suffix = index === predicates.length - 1 ? " ." : " ;";
-      return `${prefix}${predicate}${suffix}`;
-    })
-    .join("\n");
-
-  return [
-    `@prefix : <${namespaceIri(draft)}> .`,
-    "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
-    "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
-    "@prefix skos: <http://www.w3.org/2004/02/skos/core#> .",
-    "",
-    `:${entityLocalName(entity)} ${body}`,
-  ].join("\n");
-}
-
 function entityIri(draft: OntologyDraft, entity: Entity) {
   return `${namespaceIri(draft)}${entityLocalName(entity)}`;
 }
@@ -378,7 +272,7 @@ function namespaceIri(draft: OntologyDraft) {
   if (/^https?:\/\//.test(suggestion)) {
     return /[#/]$/.test(suggestion) ? suggestion : `${suggestion}#`;
   }
-  return `https://example.org/ontology/${slug(suggestion || draft.domain)}#`;
+  return `https://example.org/ontology/${namespacePath(suggestion || draft.domain)}#`;
 }
 
 function entityLocalName(entity: Entity) {
@@ -396,129 +290,6 @@ function titleCaseIdentifier(value: string) {
     .join("");
 }
 
-function owlTypeForEntity(entity: Entity) {
-  if (entity.entity_type === "attribute") {
-    return "owl:DatatypeProperty";
-  }
-  if (entity.entity_type === "value") {
-    return "owl:NamedIndividual";
-  }
-  return "owl:Class";
-}
-
-function ttlString(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\s+/g, " ").trim();
-}
-
-function downloadOwlFragment(draft: OntologyDraft, entity: Entity, owlFragment: string) {
-  const blob = new Blob([owlFragment], { type: "text/turtle" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${slug(draft.domain)}-${slug(entity.label)}.ttl`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function slug(value: string) {
+function namespacePath(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ontology";
-}
-
-function SelectedStatementCard({
-  canCommit,
-  committed,
-  onCommit,
-  onDecision,
-  review,
-}: {
-  canCommit: boolean;
-  committed: CommitResponse | null;
-  onCommit: () => void;
-  onDecision: (status: ReviewStatus, text?: string) => void;
-  review: StatementReview;
-}) {
-  return (
-    <section className="selected-card">
-      <span className={`status-pill ${review.status}`}>{STATUS_LABELS[review.status]}</span>
-      <p>{review.statement.text}</p>
-
-      <div className="impact-list">
-        {review.impact.entities.map((item) => (
-          <span key={`entity-${item.id}`}>Entity: {item.label}</span>
-        ))}
-        {review.impact.relationships.map((item) => (
-          <span key={`relationship-${item.id}`}>Relationship: {item.label}</span>
-        ))}
-        {review.impact.rules.map((item) => (
-          <span key={`rule-${item.id}`}>Rule: {item.label}</span>
-        ))}
-      </div>
-
-      <div className="decision-grid">
-        <button onClick={() => onDecision("accepted")} type="button">
-          <Check size={16} />
-          Accept
-        </button>
-        <button onClick={() => onDecision("rejected")} type="button">
-          <X size={16} />
-          Reject
-        </button>
-        <button onClick={() => onDecision("needs_clarification")} type="button">
-          <HelpCircle size={16} />
-          Clarify
-        </button>
-        <button onClick={() => onDecision("pending")} type="button">
-          <RotateCcw size={16} />
-          Reset
-        </button>
-      </div>
-
-      <EditStatement review={review} onDecision={onDecision} />
-
-      <button className="commit-button" disabled={!canCommit} onClick={onCommit} type="button">
-        <FileJson size={16} />
-        Commit accepted
-      </button>
-
-      {committed ? (
-        <div className="commit-result" role="status">
-          <strong>Committed ontology</strong>
-          <span>{committed.included_statement_ids.length} statements included</span>
-          <span>{committed.ontology.entities.length} entities ready for export</span>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function EditStatement({
-  onDecision,
-  review,
-}: {
-  onDecision: (status: ReviewStatus, text?: string) => void;
-  review: StatementReview;
-}) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const text = String(form.get("statementText") ?? "").trim();
-    if (text) {
-      onDecision("edited", text);
-    }
-  }
-
-  return (
-    <form className="edit-form" onSubmit={handleSubmit}>
-      <textarea
-        aria-label="Edit selected statement"
-        defaultValue={review.statement.text}
-        key={review.statement.id}
-        name="statementText"
-      />
-      <button type="submit">
-        <Check size={16} />
-        Save edit
-      </button>
-    </form>
-  );
 }
