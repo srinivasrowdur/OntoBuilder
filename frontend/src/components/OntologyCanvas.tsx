@@ -200,6 +200,10 @@ export function OntologyCanvas({
   const [canvasView, setCanvasView] = useState<CanvasView>("statements");
   const [isProjectDrawerOpen, setIsProjectDrawerOpen] = useState(false);
   const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
   const entityLabels = useMemo(
     () => new Map(draft?.entities.map((entity) => [entity.id, entity.label]) ?? []),
     [draft],
@@ -211,50 +215,66 @@ export function OntologyCanvas({
     onGenerate();
   }
 
+  const projectDrawer = isProjectDrawerOpen ? (
+    <ProjectDrawer
+      canSave={Boolean(session && selectedProjectId)}
+      message={projectMessage}
+      onClose={() => setIsProjectDrawerOpen(false)}
+      onCreateProject={onProjectCreate}
+      onOpenProject={onProjectOpen}
+      onSaveProject={onProjectSave}
+      projects={projects}
+      saving={projectSaving}
+      selectedProjectId={selectedProjectId}
+    />
+  ) : null;
+
+  const projectMenuButton = (
+    <button
+      aria-label="Projects"
+      className="canvas-menu-button"
+      onClick={() => setIsProjectDrawerOpen(true)}
+      type="button"
+    >
+      <Menu size={18} />
+    </button>
+  );
+
   if (!draft) {
     return (
       <section className="ontology-panel empty-state">
-        <div className="ontology-workspace-scroll">
-          <div className="status-line">
-            <span>Export readiness</span>
-            <strong>0%</strong>
-          </div>
+        {projectDrawer}
+        {projectMenuButton}
+        <div className="empty-canvas-center">
+          {selectedProject ? (
+            <h1 className="empty-project-name">{selectedProject.name}</h1>
+          ) : null}
+          <OntologyPromptDock
+            canCommit={false}
+            canDownload={false}
+            entities={[]}
+            error={error}
+            loading={loading}
+            onAcceptAll={onAcceptAll}
+            onCommit={onCommit}
+            onDownload={onDownload}
+            onGenerate={onGenerate}
+            onLoadSample={onLoadSample}
+            onPromptChange={onPromptChange}
+            pendingCount={0}
+            placement="center"
+            prompt={prompt}
+            onSubmit={handlePromptSubmit}
+          />
         </div>
-        <OntologyPromptDock
-          canCommit={false}
-          canDownload={false}
-          error={error}
-          entities={[]}
-          loading={loading}
-          onAcceptAll={onAcceptAll}
-          onCommit={onCommit}
-          onDownload={onDownload}
-          onGenerate={onGenerate}
-          onLoadSample={onLoadSample}
-          onPromptChange={onPromptChange}
-          pendingCount={0}
-          prompt={prompt}
-          onSubmit={handlePromptSubmit}
-        />
       </section>
     );
   }
 
   return (
     <section className="ontology-panel" aria-label="Ontology statements">
-      {isProjectDrawerOpen ? (
-        <ProjectDrawer
-          canSave={Boolean(session && selectedProjectId)}
-          message={projectMessage}
-          onClose={() => setIsProjectDrawerOpen(false)}
-          onCreateProject={onProjectCreate}
-          onOpenProject={onProjectOpen}
-          onSaveProject={onProjectSave}
-          projects={projects}
-          saving={projectSaving}
-          selectedProjectId={selectedProjectId}
-        />
-      ) : null}
+      {projectDrawer}
+      {projectMenuButton}
       <div className="ontology-workspace-scroll" ref={workspaceScrollRef}>
         <div className="status-line">
           <span>
@@ -270,14 +290,6 @@ export function OntologyCanvas({
             <small>{draft.scope ?? "general ontology"}</small>
           </div>
           <div className="domain-actions">
-            <button
-              aria-label="Projects"
-              className="icon-tool-button"
-              onClick={() => setIsProjectDrawerOpen(true)}
-              type="button"
-            >
-              <Menu size={16} />
-            </button>
             <div className="view-toggle" aria-label="Canvas view">
               <button
                 className={canvasView === "statements" ? "active" : ""}
@@ -386,6 +398,7 @@ export function OntologyCanvas({
         onLoadSample={onLoadSample}
         onPromptChange={onPromptChange}
         pendingCount={pendingCount}
+        placement="bottom"
         prompt={prompt}
         onSubmit={handlePromptSubmit}
       />
@@ -548,6 +561,7 @@ function OntologyPromptDock({
   onPromptChange,
   onSubmit,
   pendingCount,
+  placement = "bottom",
   prompt,
 }: {
   canCommit: boolean;
@@ -563,6 +577,7 @@ function OntologyPromptDock({
   onPromptChange: (prompt: string) => void;
   onSubmit: (event: FormEvent) => void;
   pendingCount: number;
+  placement?: "bottom" | "center";
   prompt: string;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -633,25 +648,27 @@ function OntologyPromptDock({
   }
 
   return (
-    <form className="ontology-prompt-dock" onSubmit={onSubmit}>
-      <div className="dock-actions" aria-label="Ontology actions">
-        <button onClick={onLoadSample} type="button">
-          <Upload size={15} />
-          Sample
-        </button>
-        <button disabled={!canDownload} onClick={onDownload} type="button">
-          <Download size={15} />
-          JSON
-        </button>
-        <button disabled={pendingCount === 0} onClick={onAcceptAll} type="button">
-          <Check size={15} />
-          Accept {pendingCount}
-        </button>
-        <button disabled={!canCommit} onClick={onCommit} type="button">
-          <FileJson size={15} />
-          Commit
-        </button>
-      </div>
+    <form className={`ontology-prompt-dock ${placement}`} onSubmit={onSubmit}>
+      {placement === "bottom" ? (
+        <div className="dock-actions" aria-label="Ontology actions">
+          <button onClick={onLoadSample} type="button">
+            <Upload size={15} />
+            Sample
+          </button>
+          <button disabled={!canDownload} onClick={onDownload} type="button">
+            <Download size={15} />
+            JSON
+          </button>
+          <button disabled={pendingCount === 0} onClick={onAcceptAll} type="button">
+            <Check size={15} />
+            Accept {pendingCount}
+          </button>
+          <button disabled={!canCommit} onClick={onCommit} type="button">
+            <FileJson size={15} />
+            Commit
+          </button>
+        </div>
+      ) : null}
 
       {error ? <div className="dock-error">{error}</div> : null}
 
@@ -683,7 +700,11 @@ function OntologyPromptDock({
           onClick={(event) => updateCaretFromTextarea(event.currentTarget)}
           onKeyDown={handleKeyDown}
           onKeyUp={(event) => updateCaretFromTextarea(event.currentTarget)}
-          placeholder="Create an ontology for a domain, or describe how to revise this one"
+          placeholder={
+            placement === "center"
+              ? "Describe the ontology to create"
+              : "Revise this ontology with @Entity mentions"
+          }
           ref={textareaRef}
           value={prompt}
         />

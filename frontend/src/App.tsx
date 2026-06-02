@@ -75,12 +75,6 @@ export function App() {
   }, [baseDraft, selectedEntityId]);
 
   useEffect(() => {
-    if (!session) {
-      void loadSample();
-    }
-  }, []);
-
-  useEffect(() => {
     void refreshProjects();
   }, []);
 
@@ -127,7 +121,13 @@ export function App() {
       setReviewSession(nextSession);
       setCommitted(null);
       setPrompt("");
-      await createAndSaveProjectForSession(nextSession, requestText);
+      if (selectedProjectId) {
+        const response = await saveProject(selectedProjectId, nextSession.id);
+        setProjects((current) => upsertProject(current, response.project));
+        setProjectMessage(`Project updated: ${response.project.name}`);
+      } else {
+        await createAndSaveProjectForSession(nextSession, requestText);
+      }
     } catch (nextError) {
       setError(errorMessage(nextError));
     } finally {
@@ -281,14 +281,12 @@ export function App() {
     setProjectMessage(null);
     try {
       const project = await createProject(name, description);
-      const savedProject = session
-        ? (await saveProject(project.id, session.id)).project
-        : project;
-      setProjects((current) => upsertProject(current, savedProject));
-      setSelectedProjectId(savedProject.id);
-      setProjectMessage(
-        session ? `Project created and saved: ${savedProject.name}` : `Project created: ${savedProject.name}`,
-      );
+      setProjects((current) => upsertProject(current, project));
+      setSelectedProjectId(project.id);
+      setReviewSession(null);
+      setCommitted(null);
+      setPrompt("");
+      setProjectMessage(`Project created: ${project.name}`);
     } catch (nextError) {
       setError(errorMessage(nextError));
       throw nextError;
@@ -322,6 +320,12 @@ export function App() {
     setSelectedProjectId(projectId);
     setProjectMessage(null);
     if (!project?.draft_id) {
+      setReviewSession(null);
+      setCommitted(null);
+      setPrompt("");
+      if (project) {
+        setProjectMessage(`Opened ${project.name}`);
+      }
       return;
     }
     setLoading(true);
@@ -394,10 +398,16 @@ export function App() {
     URL.revokeObjectURL(url);
   }
 
-  function setReviewSession(nextSession: DraftReviewSession) {
+  function setReviewSession(nextSession: DraftReviewSession | null) {
     setSession(nextSession);
     setEntityLabelPreviews({});
     setStatementTextPreviews({});
+    if (!nextSession) {
+      setSelectedEntityId(null);
+      setSelectedStatementId(null);
+      setInspectorMode("statement");
+      return;
+    }
     setSelectedStatementId((currentId) => {
       const statementIds = nextSession.statements.map((review) => review.statement.id);
       return currentId && statementIds.includes(currentId) ? currentId : statementIds[0] ?? null;

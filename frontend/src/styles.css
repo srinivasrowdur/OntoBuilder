@@ -64,6 +64,7 @@ button:disabled {
 }
 
 .ontology-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -84,8 +85,59 @@ button:disabled {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 1.25rem 1.65rem 1.2rem;
+  padding: 1.25rem 1.65rem 1.2rem 4.3rem;
   scrollbar-width: thin;
+}
+
+.empty-state {
+  justify-content: center;
+}
+
+.canvas-menu-button {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.32rem;
+  height: 2.32rem;
+  border: 1px solid rgba(214, 224, 244, 0.12);
+  border-radius: 0.52rem;
+  background: rgba(14, 18, 29, 0.84);
+  color: #c6d3e8;
+  padding: 0;
+  box-shadow:
+    0 0.85rem 1.8rem rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(14px);
+}
+
+.canvas-menu-button:hover {
+  border-color: rgba(123, 169, 244, 0.64);
+  background: rgba(91, 143, 231, 0.18);
+  color: #f2f7ff;
+}
+
+.empty-canvas-center {
+  flex: 1 1 auto;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1.18rem;
+  min-height: 0;
+  padding: 4.5rem 1.65rem;
+}
+
+.empty-project-name {
+  max-width: min(48rem, 90%);
+  margin: 0;
+  color: #e6ebf5;
+  font-size: clamp(1.45rem, 3vw, 2.15rem);
+  font-weight: 720;
+  line-height: 1.08;
+  text-align: center;
 }
 
 .status-line {
@@ -154,25 +206,6 @@ button:disabled {
   align-items: center;
   justify-content: flex-end;
   gap: 0.48rem;
-}
-
-.icon-tool-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.42rem;
-  background: rgba(255, 255, 255, 0.035);
-  color: #b8c4da;
-  padding: 0;
-}
-
-.icon-tool-button:hover {
-  border-color: rgba(123, 169, 244, 0.55);
-  background: rgba(91, 143, 231, 0.12);
-  color: #edf4ff;
 }
 
 .project-drawer-shell {
@@ -850,6 +883,31 @@ button:disabled {
     #090b10;
   padding: 0.72rem 1.65rem 0.86rem;
   box-shadow: 0 -1rem 2.4rem rgba(0, 0, 0, 0.26);
+}
+
+.ontology-prompt-dock.center {
+  width: min(52rem, 92%);
+  border-top: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.ontology-prompt-dock.center .dock-error {
+  margin-bottom: 0.58rem;
+}
+
+.ontology-prompt-dock.center .prompt-compose {
+  max-width: none;
+  border-color: rgba(214, 224, 244, 0.18);
+  border-radius: 0.95rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%),
+    #10141d;
+  padding: 0.64rem;
+  box-shadow:
+    0 2.2rem 5rem rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.025) inset;
 }
 
 .dock-actions {
@@ -1697,11 +1755,20 @@ select {
   }
 
   .ontology-workspace-scroll {
-    padding: 1rem;
+    padding: 1rem 1rem 1rem 3.85rem;
+  }
+
+  .empty-canvas-center {
+    padding: 4rem 1rem;
   }
 
   .ontology-prompt-dock {
     padding: 0.68rem 1rem 0.78rem;
+  }
+
+  .ontology-prompt-dock.center {
+    width: min(100%, 38rem);
+    padding: 0;
   }
 
   .status-line {
