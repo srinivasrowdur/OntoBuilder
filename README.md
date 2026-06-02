@@ -2,9 +2,10 @@
 
 OntoBuilder is an ontology-building workspace for drafting, reviewing, editing,
 and exporting domain ontologies as structured JSON. The current app uses a
-Python/Agno backend with a React review UI. Users can ask for any domain, review
-the generated ontology as plain-English statements, edit entities inline, add
-new statements, and commit only the accepted ontology elements.
+Python/Agno backend with a React ontology workspace. Users can ask for any
+domain, review the generated ontology as plain-English statements or a
+relationship graph, inspect entities and statements, add new statements, and
+commit only the accepted ontology elements.
 
 The repository also includes an earlier contract-intelligence OWL ontology
 starter kit, which remains available under the root ontology files.
@@ -15,8 +16,10 @@ starter kit, which remains available under the root ontology files.
   assumptions, open questions, and competency questions.
 - Renders ontology structure as readable statements, such as
   `A Member belongs to a Pension Scheme.`
+- Shows a relationship graph for the same ontology using the React graph view.
 - Lets users approve, reject, clarify, edit, or bulk-accept statements.
-- Lets users rename entities directly from statement chips.
+- Lets users inspect entities from text chips or graph nodes, then rename them
+  from the entity inspector.
 - Lets users compose new relationship statements from existing or new entities.
 - Lets users compose rule statements with severity, property, operator, and value.
 - Commits accepted/edited statements into a clean, exportable ontology JSON.
@@ -44,7 +47,8 @@ Key folders and files:
 - `projects/`: optional local folder-backed knowledge base for saved ontology projects.
 - `ontology_agent/skills/`: modular skills for scope control, concept gathering,
   relationship design, rule design, statement rendering, validation, and JSON export.
-- `examples/retirements-ontology-draft.json`: sample draft used by the UI.
+- `examples/retirements-ontology-draft.json`: sample draft that the UI can load
+  without calling an LLM.
 - `docs/ontology-agent.md`: deeper agent and API notes.
 - `tests/`: schema, tools, API, and UI-adjacent tests.
 
@@ -58,7 +62,8 @@ source .venv/bin/activate
 python -m pip install -e ".[test]"
 ```
 
-Install the React UI dependencies:
+Install the React UI dependencies. Use Node.js `20.19+` or `22.12+`; the graph
+viewer dependency declares that engine range.
 
 ```sh
 cd frontend
@@ -118,11 +123,16 @@ Open:
 
 ## UI Workflow
 
-1. Load the sample draft or ask for a new ontology domain.
-2. Review statements on the left canvas.
-3. Click an entity chip to rename it inline, then save or discard.
-4. Click `+ Statement` to add a new relationship or rule statement.
-5. Approve, reject, clarify, or edit statements in the right review panel.
+1. Open the React UI and either ask for a new ontology in the `Create ontology`
+   prompt, open an existing project from the hamburger project drawer, or load
+   the retirements sample for an offline demo.
+2. After a draft exists, use the `Text` view to review readable statements or
+   switch to `Graph` to inspect the relationship network.
+3. Select a statement row or graph edge to open the statement inspector, then
+   approve, reject, clarify, or edit the statement text.
+4. Select an entity chip or graph node to open the entity inspector, then rename
+   the entity and save or discard the change.
+5. Click `+ Statement` to add a new relationship or rule statement.
 6. Open the hamburger project drawer to create, open, or save a project.
 7. With a project open, use the bottom prompt for scoped edits such as
    `@Member owns one or more @Account` or `rename @Member to Plan Member`.
