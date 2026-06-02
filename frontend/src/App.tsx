@@ -15,6 +15,7 @@ import { draftForDisplay, getReviewCounts } from "./ontology";
 import type {
   CommitResponse,
   DraftReviewSession,
+  Entity,
   ReviewStatus,
   StatementCreatePayload,
 } from "./types";
@@ -22,6 +23,7 @@ import type {
 export function App() {
   const [session, setSession] = useState<DraftReviewSession | null>(null);
   const [selectedStatementId, setSelectedStatementId] = useState<string | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +40,32 @@ export function App() {
       null;
     return selected;
   }, [selectedStatementId, session]);
+  const selectedEntity = useMemo(() => {
+    if (!draft) {
+      return null;
+    }
+    return draft.entities.find((entity) => entity.id === selectedEntityId) ?? draft.entities[0] ?? null;
+  }, [draft, selectedEntityId]);
 
   useEffect(() => {
     if (!session) {
       void loadSample();
     }
   }, []);
+
+  useEffect(() => {
+    if (!draft) {
+      setSelectedEntityId(null);
+      return;
+    }
+
+    setSelectedEntityId((currentId) => {
+      if (currentId && draft.entities.some((entity) => entity.id === currentId)) {
+        return currentId;
+      }
+      return selectedReview?.statement.subject_entity_id ?? draft.entities[0]?.id ?? null;
+    });
+  }, [draft, selectedReview?.statement.subject_entity_id]);
 
   async function loadSample() {
     setLoading(true);
@@ -152,6 +174,18 @@ export function App() {
     }
   }
 
+  function selectStatement(statementId: string) {
+    setSelectedStatementId(statementId);
+    const statement = draft?.statements.find((candidate) => candidate.id === statementId);
+    if (statement?.subject_entity_id) {
+      setSelectedEntityId(statement.subject_entity_id);
+    }
+  }
+
+  function selectEntity(entityId: Entity["id"]) {
+    setSelectedEntityId(entityId);
+  }
+
   function downloadJson() {
     const payload = committed?.ontology ?? draft;
     if (!payload) {
@@ -182,10 +216,22 @@ export function App() {
   return (
     <main className="app-shell">
       <OntologyCanvas
+        canCommit={acceptedCount > 0}
         draft={draft}
+        error={error}
+        loading={loading}
+        onAcceptAll={acceptAllPending}
+        onCommit={commitAccepted}
         onCreateStatement={addStatement}
+        onDownload={downloadJson}
+        onGenerate={generateDraft}
+        onLoadSample={loadSample}
+        onPromptChange={setPrompt}
         onRenameEntity={renameEntity}
-        onSelectStatement={setSelectedStatementId}
+        onSelectEntity={selectEntity}
+        onSelectStatement={selectStatement}
+        prompt={prompt}
+        selectedEntityId={selectedEntity?.id ?? null}
         selectedStatementId={selectedReview?.statement.id ?? null}
         session={session}
       />
@@ -201,14 +247,14 @@ export function App() {
         onGenerate={generateDraft}
         onLoadSample={loadSample}
         onPromptChange={setPrompt}
-        onSelectStatement={setSelectedStatementId}
+        onSelectEntity={selectEntity}
+        onSelectStatement={selectStatement}
         prompt={prompt}
+        draft={draft}
+        selectedEntity={selectedEntity}
         selectedReview={selectedReview}
         session={session}
       />
-      <div className="commit-meter" aria-live="polite">
-        {acceptedCount} of {session?.statements.length ?? 0} statements accepted
-      </div>
     </main>
   );
 }

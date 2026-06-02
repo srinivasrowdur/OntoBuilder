@@ -1,6 +1,6 @@
-import { Check, List, Network, X } from "lucide-react";
+import { Check, Download, FileJson, List, Loader2, Network, Send, Upload, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import type { FormEvent, KeyboardEvent, MouseEvent } from "react";
 import type {
   GraphCanvasRef,
   GraphEdge,
@@ -29,11 +29,23 @@ import type {
 import { NewStatementButton, StatementComposer } from "./StatementComposer";
 
 interface OntologyCanvasProps {
+  canCommit: boolean;
   draft: OntologyDraft | null;
+  error: string | null;
+  loading: boolean;
+  prompt: string;
   session: DraftReviewSession | null;
+  selectedEntityId: string | null;
   selectedStatementId: string | null;
+  onAcceptAll: () => void;
+  onCommit: () => void;
   onCreateStatement: (payload: StatementCreatePayload) => Promise<void>;
+  onDownload: () => void;
+  onGenerate: () => void;
+  onLoadSample: () => void;
+  onPromptChange: (prompt: string) => void;
   onRenameEntity: (entityId: string, label: string) => Promise<void>;
+  onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
 }
 
@@ -143,10 +155,22 @@ const ONTOLOGY_GRAPH_THEME: Theme = {
 };
 
 export function OntologyCanvas({
+  canCommit,
   draft,
+  error,
+  loading,
   onCreateStatement,
+  onAcceptAll,
+  onCommit,
+  onDownload,
+  onGenerate,
+  onLoadSample,
+  onPromptChange,
   onRenameEntity,
+  onSelectEntity,
+  prompt,
   session,
+  selectedEntityId,
   selectedStatementId,
   onSelectStatement,
 }: OntologyCanvasProps) {
@@ -160,141 +184,267 @@ export function OntologyCanvas({
     () => new Map(draft?.entities.map((entity) => [entity.id, entity.label]) ?? []),
     [draft],
   );
+  const pendingCount = session?.statements.filter((review) => review.status === "pending").length ?? 0;
+
+  function handlePromptSubmit(event: FormEvent) {
+    event.preventDefault();
+    onGenerate();
+  }
 
   if (!draft) {
     return (
       <section className="ontology-panel empty-state">
-        <div className="status-line">
-          <span>Export readiness</span>
-          <strong>0%</strong>
+        <div className="ontology-workspace-scroll">
+          <div className="status-line">
+            <span>Export readiness</span>
+            <strong>0%</strong>
+          </div>
         </div>
+        <OntologyPromptDock
+          canCommit={false}
+          canDownload={false}
+          error={error}
+          loading={loading}
+          onAcceptAll={onAcceptAll}
+          onCommit={onCommit}
+          onDownload={onDownload}
+          onGenerate={onGenerate}
+          onLoadSample={onLoadSample}
+          onPromptChange={onPromptChange}
+          pendingCount={0}
+          prompt={prompt}
+          onSubmit={handlePromptSubmit}
+        />
       </section>
     );
   }
 
   return (
     <section className="ontology-panel" aria-label="Ontology statements">
-      <div className="status-line">
-        <span>
-          Export readiness <strong>{readiness}%</strong>
-        </span>
-        <span className="dot">·</span>
-        <span className="issue">{blockingIssues} blocking issues</span>
-      </div>
-
-      <div className="domain-title">
-        <div className="domain-copy">
-          <span>{draft.domain}</span>
-          <small>{draft.scope ?? "general ontology"}</small>
+      <div className="ontology-workspace-scroll">
+        <div className="status-line">
+          <span>
+            Export readiness <strong>{readiness}%</strong>
+          </span>
+          <span className="dot">·</span>
+          <span className="issue">{blockingIssues} blocking issues</span>
         </div>
-        <div className="domain-actions">
-          <div className="view-toggle" aria-label="Canvas view">
-            <button
-              className={canvasView === "statements" ? "active" : ""}
-              onClick={() => setCanvasView("statements")}
-              type="button"
-            >
-              <List size={15} />
-              Text
-            </button>
-            <button
-              className={canvasView === "graph" ? "active" : ""}
-              onClick={() => {
-                setIsComposerOpen(false);
-                setCanvasView("graph");
-              }}
-              type="button"
-            >
-              <Network size={15} />
-              Graph
-            </button>
+
+        <div className="domain-title">
+          <div className="domain-copy">
+            <span>{draft.domain}</span>
+            <small>{draft.scope ?? "general ontology"}</small>
           </div>
-          <NewStatementButton
-            onClick={() => {
-              setCanvasView("statements");
-              setIsComposerOpen(true);
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="flip-stage">
-        <div className="flip-view" key={canvasView}>
-          {canvasView === "statements" ? (
-            <div className="statement-list">
-              {isComposerOpen ? (
-                <StatementComposer
-                  draft={draft}
-                  onCancel={() => setIsComposerOpen(false)}
-                  onCreateStatement={onCreateStatement}
-                />
-              ) : null}
-
-              {draft.statements.map((statement) => (
-                <div
-                  className={[
-                    "statement-row",
-                    `statement-${statement.kind}`,
-                    selectedStatementId === statement.id ? "selected" : "",
-                    statementStatus(session, statement),
-                  ].join(" ")}
-                  key={statement.id}
-                  onClick={() => onSelectStatement(statement.id)}
-                >
-                  <span className="statement-status" aria-hidden="true" />
-                  <span className="statement-body">
-                    <span className={`statement-kind ${statement.kind}`}>
-                      {statement.kind === "rule" ? "Rule" : "Relationship"}
-                    </span>
-                    <span className="statement">
-                      {renderStatementParts(statement, draft).map((part, index) =>
-                        renderStatementPart({
-                          editingEntity,
-                          editingLabel,
-                          entityLabels,
-                          index,
-                          onRenameEntity,
-                          onSelectStatement,
-                          part,
-                          savingEntityId,
-                          setEditingEntity,
-                          setEditingLabel,
-                          setSavingEntityId,
-                          statement,
-                        }),
-                      )}
-                    </span>
-                  </span>
-                </div>
-              ))}
+          <div className="domain-actions">
+            <div className="view-toggle" aria-label="Canvas view">
+              <button
+                className={canvasView === "statements" ? "active" : ""}
+                onClick={() => setCanvasView("statements")}
+                type="button"
+              >
+                <List size={15} />
+                Text
+              </button>
+              <button
+                className={canvasView === "graph" ? "active" : ""}
+                onClick={() => {
+                  setIsComposerOpen(false);
+                  setCanvasView("graph");
+                }}
+                type="button"
+              >
+                <Network size={15} />
+                Graph
+              </button>
             </div>
-          ) : (
-            <RelationshipGraph
-              draft={draft}
-              onSelectStatement={onSelectStatement}
-              selectedStatementId={selectedStatementId}
+            <NewStatementButton
+              onClick={() => {
+                setCanvasView("statements");
+                setIsComposerOpen(true);
+              }}
             />
-          )}
+          </div>
+        </div>
+
+        <div className="flip-stage">
+          <div className="flip-view" key={canvasView}>
+            {canvasView === "statements" ? (
+              <div className="statement-list">
+                {isComposerOpen ? (
+                  <StatementComposer
+                    draft={draft}
+                    onCancel={() => setIsComposerOpen(false)}
+                    onCreateStatement={onCreateStatement}
+                  />
+                ) : null}
+
+                {draft.statements.map((statement) => (
+                  <div
+                    className={[
+                      "statement-row",
+                      `statement-${statement.kind}`,
+                      selectedStatementId === statement.id ? "selected" : "",
+                      statementStatus(session, statement),
+                    ].join(" ")}
+                    key={statement.id}
+                    onClick={() => onSelectStatement(statement.id)}
+                  >
+                    <span className="statement-status" aria-hidden="true" />
+                    <span className="statement-body">
+                      <span className={`statement-kind ${statement.kind}`}>
+                        {statement.kind === "rule" ? "Rule" : "Relationship"}
+                      </span>
+                      <span className="statement">
+                        {renderStatementParts(statement, draft).map((part, index) =>
+                          renderStatementPart({
+                            editingEntity,
+                            editingLabel,
+                            entityLabels,
+                            index,
+                            onRenameEntity,
+                            onSelectEntity,
+                            onSelectStatement,
+                            part,
+                            savingEntityId,
+                            selectedEntityId,
+                            setEditingEntity,
+                            setEditingLabel,
+                            setSavingEntityId,
+                            statement,
+                          }),
+                        )}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <RelationshipGraph
+                draft={draft}
+                onSelectEntity={onSelectEntity}
+                onSelectStatement={onSelectStatement}
+                selectedEntityId={selectedEntityId}
+                selectedStatementId={selectedStatementId}
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="stats-row" aria-label="Ontology statistics">
+          <span>{draft.entities.length} entities</span>
+          <span>{draft.relationships.length} relationships</span>
+          <span>{draft.rules.length} rules</span>
+          <span>{draft.statements.length} statements</span>
         </div>
       </div>
-
-      <div className="stats-row" aria-label="Ontology statistics">
-        <span>{draft.entities.length} entities</span>
-        <span>{draft.relationships.length} relationships</span>
-        <span>{draft.rules.length} rules</span>
-        <span>{draft.statements.length} statements</span>
-      </div>
+      <OntologyPromptDock
+        canCommit={canCommit}
+        canDownload={Boolean(draft)}
+        error={error}
+        loading={loading}
+        onAcceptAll={onAcceptAll}
+        onCommit={onCommit}
+        onDownload={onDownload}
+        onGenerate={onGenerate}
+        onLoadSample={onLoadSample}
+        onPromptChange={onPromptChange}
+        pendingCount={pendingCount}
+        prompt={prompt}
+        onSubmit={handlePromptSubmit}
+      />
     </section>
+  );
+}
+
+function OntologyPromptDock({
+  canCommit,
+  canDownload,
+  error,
+  loading,
+  onAcceptAll,
+  onCommit,
+  onDownload,
+  onGenerate,
+  onLoadSample,
+  onPromptChange,
+  onSubmit,
+  pendingCount,
+  prompt,
+}: {
+  canCommit: boolean;
+  canDownload: boolean;
+  error: string | null;
+  loading: boolean;
+  onAcceptAll: () => void;
+  onCommit: () => void;
+  onDownload: () => void;
+  onGenerate: () => void;
+  onLoadSample: () => void;
+  onPromptChange: (prompt: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  pendingCount: number;
+  prompt: string;
+}) {
+  return (
+    <form className="ontology-prompt-dock" onSubmit={onSubmit}>
+      <div className="dock-actions" aria-label="Ontology actions">
+        <button onClick={onLoadSample} type="button">
+          <Upload size={15} />
+          Sample
+        </button>
+        <button disabled={!canDownload} onClick={onDownload} type="button">
+          <Download size={15} />
+          JSON
+        </button>
+        <button disabled={pendingCount === 0} onClick={onAcceptAll} type="button">
+          <Check size={15} />
+          Accept {pendingCount}
+        </button>
+        <button disabled={!canCommit} onClick={onCommit} type="button">
+          <FileJson size={15} />
+          Commit
+        </button>
+      </div>
+
+      {error ? <div className="dock-error">{error}</div> : null}
+
+      <div className="prompt-compose">
+        <textarea
+          aria-label="Create ontology"
+          onChange={(event) => onPromptChange(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+              event.preventDefault();
+              onGenerate();
+            }
+          }}
+          placeholder="Create an ontology for a domain, or describe how to revise this one"
+          value={prompt}
+        />
+        <button
+          aria-label="Generate ontology"
+          className="send-button"
+          disabled={loading || !prompt.trim()}
+          type="submit"
+        >
+          {loading ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
+        </button>
+      </div>
+    </form>
   );
 }
 
 function RelationshipGraph({
   draft,
+  onSelectEntity,
   onSelectStatement,
+  selectedEntityId,
   selectedStatementId,
 }: {
   draft: OntologyDraft;
+  onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
+  selectedEntityId: string | null;
   selectedStatementId: string | null;
 }) {
   const graphRef = useRef<GraphCanvasRef | null>(null);
@@ -340,17 +490,21 @@ function RelationshipGraph({
     ? graph.relationshipById.get(selectedRelationshipId)
     : null;
   const selectedIds = useMemo(
-    () =>
-      selectedRelationship
-        ? [
-            selectedRelationship.id,
-            selectedRelationship.subject_entity_id,
-            selectedRelationship.object_entity_id,
-          ]
-        : selectedStatement?.subject_entity_id
-          ? [selectedStatement.subject_entity_id]
-          : [],
-    [selectedRelationship, selectedStatement],
+    () => {
+      if (selectedRelationship) {
+        return [
+          selectedRelationship.id,
+          selectedRelationship.subject_entity_id,
+          selectedRelationship.object_entity_id,
+        ];
+      }
+
+      const selectedEntityIds = [selectedEntityId, selectedStatement?.subject_entity_id].filter(
+        (entityId): entityId is string => Boolean(entityId),
+      );
+      return [...new Set(selectedEntityIds)];
+    },
+    [selectedEntityId, selectedRelationship, selectedStatement],
   );
 
   useEffect(() => {
@@ -403,7 +557,9 @@ function RelationshipGraph({
             minNodeSize={7}
             nodes={graph.nodes}
             onEdgeClick={(edge) => selectStatementForEdge(edge, statementByRelationshipId, onSelectStatement)}
-            onNodeClick={(node) => selectStatementForNode(node, statementByEntityId, onSelectStatement)}
+            onNodeClick={(node) =>
+              selectStatementForNode(node, statementByEntityId, onSelectStatement, onSelectEntity)
+            }
             ref={graphRef}
             selections={selectedIds}
             sizingType="default"
@@ -577,11 +733,13 @@ function selectStatementForNode(
   node: InternalGraphNode,
   statementByEntityId: Map<string, NaturalLanguageStatement>,
   onSelectStatement: (statementId: string) => void,
+  onSelectEntity: (entityId: string) => void,
 ) {
   const statement = statementByEntityId.get(node.id);
   if (statement) {
     onSelectStatement(statement.id);
   }
+  onSelectEntity(node.id);
 }
 
 function renderStatementPart({
@@ -590,9 +748,11 @@ function renderStatementPart({
   entityLabels,
   index,
   onRenameEntity,
+  onSelectEntity,
   onSelectStatement,
   part,
   savingEntityId,
+  selectedEntityId,
   setEditingEntity,
   setEditingLabel,
   setSavingEntityId,
@@ -603,9 +763,11 @@ function renderStatementPart({
   entityLabels: Map<string, string>;
   index: number;
   onRenameEntity: (entityId: string, label: string) => Promise<void>;
+  onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
   part: StatementPart;
   savingEntityId: string | null;
+  selectedEntityId: string | null;
   setEditingEntity: (value: EditingEntity | null) => void;
   setEditingLabel: (value: string) => void;
   setSavingEntityId: (value: string | null) => void;
@@ -691,15 +853,22 @@ function renderStatementPart({
   return (
     <button
       aria-label={`Edit entity ${entityLabels.get(part.entityId) ?? part.value}`}
-      className="chip entity entity-chip"
+      className={[
+        "chip entity entity-chip",
+        selectedEntityId === part.entityId ? "selected-entity" : "",
+      ].join(" ")}
       key={key}
       onClick={(event) => {
         event.stopPropagation();
         onSelectStatement(statement.id);
+        onSelectEntity(part.entityId);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
         setEditingEntity({ statementId: statement.id, entityId: part.entityId });
         setEditingLabel(entityLabels.get(part.entityId) ?? part.value);
       }}
-      title="Edit entity name"
+      title="Select entity. Double-click to rename."
       type="button"
     >
       {part.value}
