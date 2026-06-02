@@ -1,5 +1,5 @@
 import { Check, Download, FileJson, List, Loader2, Network, Send, Upload, X } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, MouseEvent } from "react";
 import type {
   GraphCanvasRef,
@@ -180,6 +180,7 @@ export function OntologyCanvas({
   const [editingLabel, setEditingLabel] = useState("");
   const [savingEntityId, setSavingEntityId] = useState<string | null>(null);
   const [canvasView, setCanvasView] = useState<CanvasView>("statements");
+  const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
   const entityLabels = useMemo(
     () => new Map(draft?.entities.map((entity) => [entity.id, entity.label]) ?? []),
     [draft],
@@ -221,7 +222,7 @@ export function OntologyCanvas({
 
   return (
     <section className="ontology-panel" aria-label="Ontology statements">
-      <div className="ontology-workspace-scroll">
+      <div className="ontology-workspace-scroll" ref={workspaceScrollRef}>
         <div className="status-line">
           <span>
             Export readiness <strong>{readiness}%</strong>
@@ -250,6 +251,7 @@ export function OntologyCanvas({
                 onClick={() => {
                   setIsComposerOpen(false);
                   setCanvasView("graph");
+                  workspaceScrollRef.current?.scrollTo({ top: 0 });
                 }}
                 type="button"
               >
@@ -448,6 +450,7 @@ function RelationshipGraph({
   selectedStatementId: string | null;
 }) {
   const graphRef = useRef<GraphCanvasRef | null>(null);
+  const graphMapRef = useRef<HTMLDivElement | null>(null);
   const statementByRelationshipId = useMemo(() => {
     const statements = new Map<string, NaturalLanguageStatement>();
     for (const statement of draft.statements) {
@@ -473,6 +476,21 @@ function RelationshipGraph({
     return statements;
   }, [draft.statements]);
   const graph = useMemo(() => buildOntologyGraphData(draft), [draft]);
+  const graphNodeIds = useMemo(() => graph.nodes.map((node) => node.id), [graph.nodes]);
+  const graphRenderKey = useMemo(
+    () =>
+      [
+        graph.nodes.map((node) => node.id).join("|"),
+        graph.edges.map((edge) => edge.id).join("|"),
+      ].join("::"),
+    [graph.edges, graph.nodes],
+  );
+  const fitGraphToView = useCallback(() => {
+    if (graphNodeIds.length === 0) {
+      return;
+    }
+    graphRef.current?.fitNodesInView(graphNodeIds, { animated: false });
+  }, [graphNodeIds]);
   const layoutOverrides = useMemo(
     () =>
       ({
@@ -508,12 +526,54 @@ function RelationshipGraph({
   );
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      graphRef.current?.fitNodesInView(undefined, { animated: false });
-    }, 900);
+    let cancelled = false;
+    const frameIds: number[] = [];
+    const timeoutIds = [120, 360, 900, 1500].map((delay) =>
+      window.setTimeout(() => {
+        if (!cancelled) {
+          fitGraphToView();
+        }
+      }, delay),
+    );
 
-    return () => window.clearTimeout(timeoutId);
-  }, [graph.edges, graph.nodes]);
+    const firstFrame = window.requestAnimationFrame(() => {
+      if (cancelled) {
+        return;
+      }
+      const secondFrame = window.requestAnimationFrame(() => {
+        if (!cancelled) {
+          fitGraphToView();
+        }
+      });
+      frameIds.push(secondFrame);
+    });
+    frameIds.push(firstFrame);
+
+    return () => {
+      cancelled = true;
+      frameIds.forEach(window.cancelAnimationFrame);
+      timeoutIds.forEach(window.clearTimeout);
+    };
+  }, [fitGraphToView, graph.edges.length, graph.nodes.length]);
+
+  useEffect(() => {
+    const graphMap = graphMapRef.current;
+    if (!graphMap || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    let frameId = 0;
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(fitGraphToView);
+    });
+    observer.observe(graphMap);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [fitGraphToView]);
 
   if (graph.nodes.length === 0) {
     return (
@@ -530,7 +590,7 @@ function RelationshipGraph({
         <span>{graph.edges.length} edges</span>
       </div>
 
-      <div className="graph-map reagraph-map">
+      <div className="graph-map reagraph-map" ref={graphMapRef}>
         <Suspense
           fallback={
             <div className="graph-loading" role="status" aria-label="Loading graph">
@@ -549,7 +609,7 @@ function RelationshipGraph({
             edgeInterpolation="curved"
             edgeLabelPosition="natural"
             edges={graph.edges}
-            key={`${graph.nodes.length}-${graph.edges.length}`}
+            key={graphRenderKey}
             labelType="all"
             layoutOverrides={layoutOverrides}
             layoutType="custom"
