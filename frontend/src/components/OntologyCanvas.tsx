@@ -1,4 +1,17 @@
-import { Check, Download, FileJson, List, Loader2, Network, Send, Upload, X } from "lucide-react";
+import {
+  Check,
+  Download,
+  FileJson,
+  Folder,
+  List,
+  Loader2,
+  Menu,
+  Network,
+  Save,
+  Send,
+  Upload,
+  X,
+} from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, MouseEvent } from "react";
 import type {
@@ -23,6 +36,7 @@ import type {
   Entity,
   NaturalLanguageStatement,
   OntologyDraft,
+  ProjectSummary,
   Relationship,
   StatementCreatePayload,
 } from "../types";
@@ -34,6 +48,10 @@ interface OntologyCanvasProps {
   error: string | null;
   loading: boolean;
   prompt: string;
+  projectMessage: string | null;
+  projectSaving: boolean;
+  projects: ProjectSummary[];
+  selectedProjectId: string | null;
   session: DraftReviewSession | null;
   selectedEntityId: string | null;
   selectedStatementId: string | null;
@@ -44,7 +62,9 @@ interface OntologyCanvasProps {
   onGenerate: () => void;
   onLoadSample: () => void;
   onPromptChange: (prompt: string) => void;
-  onRenameEntity: (entityId: string, label: string) => Promise<void>;
+  onProjectCreate: (name: string, description?: string) => Promise<void>;
+  onProjectOpen: (projectId: string) => Promise<void>;
+  onProjectSave: () => Promise<void>;
   onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
 }
@@ -55,11 +75,6 @@ interface TextRange {
   label: string;
   kind: "entity" | "constraint";
   entityId?: string;
-}
-
-interface EditingEntity {
-  statementId: string;
-  entityId: string;
 }
 
 type CanvasView = "statements" | "graph";
@@ -166,20 +181,24 @@ export function OntologyCanvas({
   onGenerate,
   onLoadSample,
   onPromptChange,
-  onRenameEntity,
+  onProjectCreate,
+  onProjectOpen,
+  onProjectSave,
   onSelectEntity,
   prompt,
+  projectMessage,
+  projectSaving,
+  projects,
   session,
   selectedEntityId,
+  selectedProjectId,
   selectedStatementId,
   onSelectStatement,
 }: OntologyCanvasProps) {
   const { readiness, blockingIssues } = getReadiness(draft);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [editingEntity, setEditingEntity] = useState<EditingEntity | null>(null);
-  const [editingLabel, setEditingLabel] = useState("");
-  const [savingEntityId, setSavingEntityId] = useState<string | null>(null);
   const [canvasView, setCanvasView] = useState<CanvasView>("statements");
+  const [isProjectDrawerOpen, setIsProjectDrawerOpen] = useState(false);
   const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
   const entityLabels = useMemo(
     () => new Map(draft?.entities.map((entity) => [entity.id, entity.label]) ?? []),
@@ -205,6 +224,7 @@ export function OntologyCanvas({
           canCommit={false}
           canDownload={false}
           error={error}
+          entities={[]}
           loading={loading}
           onAcceptAll={onAcceptAll}
           onCommit={onCommit}
@@ -222,6 +242,19 @@ export function OntologyCanvas({
 
   return (
     <section className="ontology-panel" aria-label="Ontology statements">
+      {isProjectDrawerOpen ? (
+        <ProjectDrawer
+          canSave={Boolean(session && selectedProjectId)}
+          message={projectMessage}
+          onClose={() => setIsProjectDrawerOpen(false)}
+          onCreateProject={onProjectCreate}
+          onOpenProject={onProjectOpen}
+          onSaveProject={onProjectSave}
+          projects={projects}
+          saving={projectSaving}
+          selectedProjectId={selectedProjectId}
+        />
+      ) : null}
       <div className="ontology-workspace-scroll" ref={workspaceScrollRef}>
         <div className="status-line">
           <span>
@@ -237,6 +270,14 @@ export function OntologyCanvas({
             <small>{draft.scope ?? "general ontology"}</small>
           </div>
           <div className="domain-actions">
+            <button
+              aria-label="Projects"
+              className="icon-tool-button"
+              onClick={() => setIsProjectDrawerOpen(true)}
+              type="button"
+            >
+              <Menu size={16} />
+            </button>
             <div className="view-toggle" aria-label="Canvas view">
               <button
                 className={canvasView === "statements" ? "active" : ""}
@@ -299,19 +340,12 @@ export function OntologyCanvas({
                       <span className="statement">
                         {renderStatementParts(statement, draft).map((part, index) =>
                           renderStatementPart({
-                            editingEntity,
-                            editingLabel,
                             entityLabels,
                             index,
-                            onRenameEntity,
                             onSelectEntity,
                             onSelectStatement,
                             part,
-                            savingEntityId,
                             selectedEntityId,
-                            setEditingEntity,
-                            setEditingLabel,
-                            setSavingEntityId,
                             statement,
                           }),
                         )}
@@ -343,6 +377,7 @@ export function OntologyCanvas({
         canCommit={canCommit}
         canDownload={Boolean(draft)}
         error={error}
+        entities={draft.entities}
         loading={loading}
         onAcceptAll={onAcceptAll}
         onCommit={onCommit}
@@ -358,9 +393,151 @@ export function OntologyCanvas({
   );
 }
 
+function ProjectDrawer({
+  canSave,
+  message,
+  onClose,
+  onCreateProject,
+  onOpenProject,
+  onSaveProject,
+  projects,
+  saving,
+  selectedProjectId,
+}: {
+  canSave: boolean;
+  message: string | null;
+  onClose: () => void;
+  onCreateProject: (name: string, description?: string) => Promise<void>;
+  onOpenProject: (projectId: string) => Promise<void>;
+  onSaveProject: () => Promise<void>;
+  projects: ProjectSummary[];
+  saving: boolean;
+  selectedProjectId: string | null;
+}) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  async function handleCreateProject(event: FormEvent) {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName || saving) {
+      return;
+    }
+    try {
+      await onCreateProject(trimmedName, description.trim() || undefined);
+      setName("");
+      setDescription("");
+      setIsCreating(false);
+    } catch {
+      // Global app error state owns the rendered failure message.
+    }
+  }
+
+  async function handleSaveProject() {
+    try {
+      await onSaveProject();
+    } catch {
+      // Global app error state owns the rendered failure message.
+    }
+  }
+
+  async function handleOpenProject(projectId: string) {
+    try {
+      await onOpenProject(projectId);
+      onClose();
+    } catch {
+      // Global app error state owns the rendered failure message.
+    }
+  }
+
+  return (
+    <div className="project-drawer-shell" role="presentation">
+      <button aria-label="Close projects" className="project-drawer-scrim" onClick={onClose} type="button" />
+      <aside className="project-drawer" aria-label="Projects">
+        <div className="project-drawer-header">
+          <div>
+            <span>Workspace</span>
+            <strong>Projects</strong>
+          </div>
+          <button aria-label="Close projects" onClick={onClose} type="button">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="project-drawer-actions">
+          <button
+            disabled={saving}
+            onClick={() => setIsCreating((current) => !current)}
+            type="button"
+          >
+            <Folder size={15} />
+            New Project
+          </button>
+          <button
+            disabled={!canSave || saving}
+            onClick={() => void handleSaveProject()}
+            type="button"
+          >
+            {saving ? <Loader2 className="spin" size={15} /> : <Save size={15} />}
+            Save Current
+          </button>
+        </div>
+
+        {isCreating ? (
+          <form className="project-create-form" onSubmit={handleCreateProject}>
+            <input
+              aria-label="Project name"
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Project name"
+              value={name}
+            />
+            <input
+              aria-label="Project description"
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Description"
+              value={description}
+            />
+            <button disabled={!name.trim() || saving} type="submit">
+              <Check size={14} />
+              Create
+            </button>
+          </form>
+        ) : null}
+
+        {message ? <p className="project-message">{message}</p> : null}
+
+        <div className="project-list" aria-label="Saved projects">
+          {projects.length === 0 ? (
+            <p>No projects yet.</p>
+          ) : (
+            projects.map((project) => (
+              <button
+                className={selectedProjectId === project.id ? "active" : ""}
+                key={project.id}
+                onClick={() => void handleOpenProject(project.id)}
+                type="button"
+              >
+                <strong>{project.name}</strong>
+                <span>{project.domain ?? "No ontology saved"}</span>
+                <small>
+                  {project.statement_count > 0
+                    ? `${project.entity_count} entities · ${project.statement_count} statements`
+                    : "Empty project"}
+                </small>
+              </button>
+            ))
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 function OntologyPromptDock({
   canCommit,
   canDownload,
+  entities,
   error,
   loading,
   onAcceptAll,
@@ -375,6 +552,7 @@ function OntologyPromptDock({
 }: {
   canCommit: boolean;
   canDownload: boolean;
+  entities: Entity[];
   error: string | null;
   loading: boolean;
   onAcceptAll: () => void;
@@ -387,6 +565,73 @@ function OntologyPromptDock({
   pendingCount: number;
   prompt: string;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [caretIndex, setCaretIndex] = useState(0);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(0);
+  const activeMention = useMemo(
+    () => getActiveMention(prompt, caretIndex),
+    [caretIndex, prompt],
+  );
+  const mentionOptions = useMemo(
+    () => mentionEntityOptions(entities, activeMention?.query ?? ""),
+    [activeMention?.query, entities],
+  );
+  const showMentionOptions = Boolean(activeMention && mentionOptions.length > 0);
+
+  useEffect(() => {
+    setActiveOptionIndex(0);
+  }, [activeMention?.query, mentionOptions.length]);
+
+  function updateCaretFromTextarea(textarea: HTMLTextAreaElement) {
+    setCaretIndex(textarea.selectionStart);
+  }
+
+  function selectMention(entity: Entity) {
+    if (!activeMention) {
+      return;
+    }
+    const token = `@${entity.label}`;
+    const nextPrompt = `${prompt.slice(0, activeMention.start)}${token}${prompt.slice(activeMention.end)}`;
+    const nextCaret = activeMention.start + token.length;
+    onPromptChange(nextPrompt);
+    setCaretIndex(nextCaret);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+    });
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      onGenerate();
+      return;
+    }
+
+    if (!showMentionOptions) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveOptionIndex((current) => (current + 1) % mentionOptions.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveOptionIndex((current) =>
+        current === 0 ? mentionOptions.length - 1 : current - 1,
+      );
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      selectMention(mentionOptions[activeOptionIndex] ?? mentionOptions[0]);
+    }
+  }
+
   return (
     <form className="ontology-prompt-dock" onSubmit={onSubmit}>
       <div className="dock-actions" aria-label="Ontology actions">
@@ -411,16 +656,35 @@ function OntologyPromptDock({
       {error ? <div className="dock-error">{error}</div> : null}
 
       <div className="prompt-compose">
+        {showMentionOptions ? (
+          <div className="mention-menu" role="listbox">
+            {mentionOptions.map((entity, index) => (
+              <button
+                className={index === activeOptionIndex ? "active" : ""}
+                key={entity.id}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectMention(entity)}
+                role="option"
+                type="button"
+              >
+                <span>{entity.label}</span>
+                <small>{entity.entity_type.replace(/_/g, " ")}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <textarea
           aria-label="Create ontology"
-          onChange={(event) => onPromptChange(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-              event.preventDefault();
-              onGenerate();
-            }
+          onBlur={(event) => updateCaretFromTextarea(event.currentTarget)}
+          onChange={(event) => {
+            onPromptChange(event.target.value);
+            updateCaretFromTextarea(event.currentTarget);
           }}
+          onClick={(event) => updateCaretFromTextarea(event.currentTarget)}
+          onKeyDown={handleKeyDown}
+          onKeyUp={(event) => updateCaretFromTextarea(event.currentTarget)}
           placeholder="Create an ontology for a domain, or describe how to revise this one"
+          ref={textareaRef}
           value={prompt}
         />
         <button
@@ -434,6 +698,63 @@ function OntologyPromptDock({
       </div>
     </form>
   );
+}
+
+function getActiveMention(
+  value: string,
+  caretIndex: number,
+): { end: number; query: string; start: number } | null {
+  const beforeCaret = value.slice(0, caretIndex);
+  const mentionStart = beforeCaret.lastIndexOf("@");
+  if (mentionStart < 0) {
+    return null;
+  }
+  const query = beforeCaret.slice(mentionStart + 1);
+  if (/[\n.,;:()[\]{}]/.test(query) || query.length > 48) {
+    return null;
+  }
+  return { end: caretIndex, query, start: mentionStart };
+}
+
+function mentionEntityOptions(entities: Entity[], query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (entities.length === 0) {
+    return [];
+  }
+  if (
+    normalizedQuery &&
+    entities.some(
+      (entity) =>
+        entity.label.toLowerCase() === normalizedQuery ||
+        entity.id.toLowerCase() === normalizedQuery,
+    )
+  ) {
+    return [];
+  }
+
+  return entities
+    .filter((entity) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+      return (
+        entity.label.toLowerCase().includes(normalizedQuery) ||
+        entity.id.toLowerCase().includes(normalizedQuery) ||
+        entity.aliases.some((alias) => alias.toLowerCase().includes(normalizedQuery))
+      );
+    })
+    .sort((left, right) => {
+      if (!normalizedQuery) {
+        return left.label.localeCompare(right.label);
+      }
+      const leftStarts = left.label.toLowerCase().startsWith(normalizedQuery);
+      const rightStarts = right.label.toLowerCase().startsWith(normalizedQuery);
+      if (leftStarts !== rightStarts) {
+        return leftStarts ? -1 : 1;
+      }
+      return left.label.localeCompare(right.label);
+    })
+    .slice(0, 7);
 }
 
 function RelationshipGraph({
@@ -476,7 +797,6 @@ function RelationshipGraph({
     return statements;
   }, [draft.statements]);
   const graph = useMemo(() => buildOntologyGraphData(draft), [draft]);
-  const graphNodeIds = useMemo(() => graph.nodes.map((node) => node.id), [graph.nodes]);
   const graphRenderKey = useMemo(
     () =>
       [
@@ -486,11 +806,11 @@ function RelationshipGraph({
     [graph.edges, graph.nodes],
   );
   const fitGraphToView = useCallback(() => {
-    if (graphNodeIds.length === 0) {
+    if (graph.nodes.length === 0) {
       return;
     }
-    graphRef.current?.fitNodesInView(graphNodeIds, { animated: false });
-  }, [graphNodeIds]);
+    graphRef.current?.fitNodesInView(undefined, { animated: false });
+  }, [graph.nodes.length]);
   const layoutOverrides = useMemo(
     () =>
       ({
@@ -527,8 +847,7 @@ function RelationshipGraph({
 
   useEffect(() => {
     let cancelled = false;
-    const frameIds: number[] = [];
-    const timeoutIds = [120, 360, 900, 1500].map((delay) =>
+    const timeoutIds = [700, 1200, 1800].map((delay) =>
       window.setTimeout(() => {
         if (!cancelled) {
           fitGraphToView();
@@ -536,22 +855,8 @@ function RelationshipGraph({
       }, delay),
     );
 
-    const firstFrame = window.requestAnimationFrame(() => {
-      if (cancelled) {
-        return;
-      }
-      const secondFrame = window.requestAnimationFrame(() => {
-        if (!cancelled) {
-          fitGraphToView();
-        }
-      });
-      frameIds.push(secondFrame);
-    });
-    frameIds.push(firstFrame);
-
     return () => {
       cancelled = true;
-      frameIds.forEach(window.cancelAnimationFrame);
       timeoutIds.forEach(window.clearTimeout);
     };
   }, [fitGraphToView, graph.edges.length, graph.nodes.length]);
@@ -562,15 +867,15 @@ function RelationshipGraph({
       return;
     }
 
-    let frameId = 0;
+    let timeoutId = 0;
     const observer = new ResizeObserver(() => {
-      window.cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(fitGraphToView);
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(fitGraphToView, 450);
     });
     observer.observe(graphMap);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
       observer.disconnect();
     };
   }, [fitGraphToView]);
@@ -803,34 +1108,20 @@ function selectStatementForNode(
 }
 
 function renderStatementPart({
-  editingEntity,
-  editingLabel,
   entityLabels,
   index,
-  onRenameEntity,
   onSelectEntity,
   onSelectStatement,
   part,
-  savingEntityId,
   selectedEntityId,
-  setEditingEntity,
-  setEditingLabel,
-  setSavingEntityId,
   statement,
 }: {
-  editingEntity: EditingEntity | null;
-  editingLabel: string;
   entityLabels: Map<string, string>;
   index: number;
-  onRenameEntity: (entityId: string, label: string) => Promise<void>;
   onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
   part: StatementPart;
-  savingEntityId: string | null;
   selectedEntityId: string | null;
-  setEditingEntity: (value: EditingEntity | null) => void;
-  setEditingLabel: (value: string) => void;
-  setSavingEntityId: (value: string | null) => void;
   statement: NaturalLanguageStatement;
 }) {
   const key = `${statement.id}-${index}`;
@@ -847,72 +1138,9 @@ function renderStatementPart({
     );
   }
 
-  const isEditing =
-    editingEntity?.statementId === statement.id && editingEntity.entityId === part.entityId;
-
-  if (isEditing) {
-    return (
-      <span className="entity-editor" key={key} onClick={stopPropagation}>
-        <input
-          aria-label={`Edit ${part.value}`}
-          autoFocus
-          disabled={savingEntityId === part.entityId}
-          onChange={(event) => setEditingLabel(event.target.value)}
-          onKeyDown={(event) =>
-            handleEntityEditorKeyDown(
-              event,
-              part.entityId,
-              entityLabels,
-              editingLabel,
-              onRenameEntity,
-              setEditingEntity,
-              setSavingEntityId,
-            )
-          }
-          style={{ width: `${Math.max(7, editingLabel.length + 1)}ch` }}
-          value={editingLabel}
-        />
-        <button
-          aria-label="Save entity name"
-          className="entity-edit-action"
-          disabled={savingEntityId === part.entityId}
-          onClick={(event) =>
-            void saveEntityEdit(
-              event,
-              part.entityId,
-              entityLabels,
-              editingLabel,
-              onRenameEntity,
-              setEditingEntity,
-              setSavingEntityId,
-            )
-          }
-          title="Save"
-          type="button"
-        >
-          <Check size={15} />
-        </button>
-        <button
-          aria-label="Discard entity name"
-          className="entity-edit-action"
-          disabled={savingEntityId === part.entityId}
-          onClick={(event) => {
-            event.stopPropagation();
-            setEditingEntity(null);
-            setEditingLabel("");
-          }}
-          title="Discard"
-          type="button"
-        >
-          <X size={15} />
-        </button>
-      </span>
-    );
-  }
-
   return (
     <button
-      aria-label={`Edit entity ${entityLabels.get(part.entityId) ?? part.value}`}
+      aria-label={`Inspect entity ${entityLabels.get(part.entityId) ?? part.value}`}
       className={[
         "chip entity entity-chip",
         selectedEntityId === part.entityId ? "selected-entity" : "",
@@ -923,12 +1151,7 @@ function renderStatementPart({
         onSelectStatement(statement.id);
         onSelectEntity(part.entityId);
       }}
-      onDoubleClick={(event) => {
-        event.stopPropagation();
-        setEditingEntity({ statementId: statement.id, entityId: part.entityId });
-        setEditingLabel(entityLabels.get(part.entityId) ?? part.value);
-      }}
-      title="Select entity. Double-click to rename."
+      title="Inspect entity"
       type="button"
     >
       {part.value}
@@ -938,58 +1161,6 @@ function renderStatementPart({
 
 function stopPropagation(event: MouseEvent<HTMLElement>) {
   event.stopPropagation();
-}
-
-async function saveEntityEdit(
-  event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLInputElement>,
-  entityId: string,
-  entityLabels: Map<string, string>,
-  editingLabel: string,
-  onRenameEntity: (entityId: string, label: string) => Promise<void>,
-  setEditingEntity: (value: EditingEntity | null) => void,
-  setSavingEntityId: (value: string | null) => void,
-) {
-  event.stopPropagation();
-  const nextLabel = editingLabel.trim();
-  if (!nextLabel || nextLabel === entityLabels.get(entityId)) {
-    setEditingEntity(null);
-    return;
-  }
-
-  setSavingEntityId(entityId);
-  try {
-    await onRenameEntity(entityId, nextLabel);
-    setEditingEntity(null);
-  } finally {
-    setSavingEntityId(null);
-  }
-}
-
-function handleEntityEditorKeyDown(
-  event: KeyboardEvent<HTMLInputElement>,
-  entityId: string,
-  entityLabels: Map<string, string>,
-  editingLabel: string,
-  onRenameEntity: (entityId: string, label: string) => Promise<void>,
-  setEditingEntity: (value: EditingEntity | null) => void,
-  setSavingEntityId: (value: string | null) => void,
-) {
-  event.stopPropagation();
-  if (event.key === "Enter") {
-    event.preventDefault();
-    void saveEntityEdit(
-      event,
-      entityId,
-      entityLabels,
-      editingLabel,
-      onRenameEntity,
-      setEditingEntity,
-      setSavingEntityId,
-    );
-  }
-  if (event.key === "Escape") {
-    setEditingEntity(null);
-  }
 }
 
 function renderStatementParts(

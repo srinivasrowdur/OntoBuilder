@@ -114,6 +114,41 @@ export interface CommitResponse {
   ontology: OntologyDraft;
 }
 
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  path: string;
+  created_at: string;
+  updated_at: string;
+  draft_id?: string | null;
+  domain?: string | null;
+  scope?: string | null;
+  saved_at?: string | null;
+  entity_count: number;
+  relationship_count: number;
+  rule_count: number;
+  statement_count: number;
+}
+
+export interface ProjectSaveResponse {
+  project: ProjectSummary;
+}
+
+export interface MentionReference {
+  id?: Identifier | null;
+  label?: string | null;
+  token?: string | null;
+}
+
+export interface ProjectRevisionResponse {
+  session: DraftReviewSession;
+  project: ProjectSummary;
+  intent: "rename_entity" | "add_relationship" | "add_rule" | "expand_entity";
+  message: string;
+}
+
 export type EntityType =
   | "class"
   | "role"
@@ -139,6 +174,8 @@ export type StatementCreatePayload =
       predicate_label: string;
       object: EntityReferencePayload;
       relationship_type?: string;
+      cardinality?: Cardinality | null;
+      statement_text?: string | null;
     }
   | {
       kind: "rule";
@@ -160,5 +197,7 @@ export type StatementCreatePayload =
         | "max_count"
         | "pattern";
       value?: string | number | boolean | string[] | null;
+      value_entity?: EntityReferencePayload | null;
       value_datatype?: string | null;
+      statement_text?: string | null;
     };

@@ -25,6 +25,7 @@ class AgentConfig:
     db_path: Path = ROOT / "tmp" / "ontology-agent.db"
     vector_path: Path = ROOT / "tmp" / "ontology-agent-vectors"
     review_path: Path = ROOT / "tmp" / "ontology-review-sessions"
+    projects_path: Path = ROOT / "projects"
     skills_dir: Path = ROOT / "ontology_agent" / "skills"
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODELS[DEFAULT_PROVIDER]
@@ -48,10 +49,12 @@ def load_config() -> AgentConfig:
     review_path = Path(
         os.getenv("ONTOLOGY_AGENT_REVIEW_PATH", str(ROOT / "tmp" / "ontology-review-sessions"))
     )
+    projects_path = Path(os.getenv("ONTOLOGY_AGENT_PROJECTS_PATH", str(ROOT / "projects")))
     return AgentConfig(
         db_path=db_path,
         vector_path=vector_path,
         review_path=review_path,
+        projects_path=projects_path,
         provider=provider,
         model=_resolve_model(provider),
         vector_db=os.getenv("ONTOLOGY_AGENT_VECTOR_DB", "none").lower(),

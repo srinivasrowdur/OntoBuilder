@@ -4,8 +4,9 @@ from fastapi.testclient import TestClient
 
 from ontology_agent.api import create_app
 from ontology_agent.config import ROOT
-from ontology_agent.review import ReviewStore
-from ontology_agent.schema import OntologyDraft
+from ontology_agent.projects import ProjectStore
+from ontology_agent.review import EntityReferenceRequest, ReviewStore, StatementCreateRequest
+from ontology_agent.schema import Cardinality, OntologyDraft
 from ontology_agent.service import OntologyRunResult
 
 
@@ -254,3 +255,285 @@ def test_api_creates_sample_draft_for_frontend(tmp_path):
     assert session["draft"]["domain"] == "retirements"
     assert session["source_prompt"] == "Sample retirements draft"
     assert len(session["statements"]) == 8
+
+
+def test_api_creates_project_and_saves_single_ontology_folder(tmp_path):
+    review_path = tmp_path / "reviews"
+    project_path = tmp_path / "projects"
+    client = TestClient(
+        create_app(
+            store=ReviewStore(review_path),
+            project_store=ProjectStore(project_path),
+        )
+    )
+
+    project_response = client.post(
+        "/api/projects",
+        json={
+            "name": "Vanguard Advisory",
+            "description": "Distribution partner reporting knowledge base.",
+        },
+    )
+    assert project_response.status_code == 200
+    project = project_response.json()
+    assert project["slug"] == "vanguard-advisory"
+
+    session = client.post("/api/ontology/drafts/samples/retirements").json()
+    save_response = client.post(
+        f"/api/projects/{project['id']}/save",
+        json={"draft_id": session["id"]},
+    )
+
+    assert save_response.status_code == 200
+    saved = save_response.json()
+    saved_project = saved["project"]
+    assert saved_project["domain"] == "retirements"
+    assert saved_project["statement_count"] == 8
+    saved_path = project_path / "vanguard-advisory"
+    assert (saved_path / "project.md").exists()
+    assert (saved_path / "ontology.md").exists()
+    assert (saved_path / "ontology.json").exists()
+    assert (saved_path / "review-session.json").exists()
+    assert (saved_path / "statements.md").exists()
+    assert (saved_path / "entities" / "member.md").exists()
+    assert "# retirements" in (saved_path / "ontology.md").read_text()
+    assert "A Member belongs to a Pension Scheme." in (saved_path / "statements.md").read_text()
+
+    projects_response = client.get("/api/projects")
+    assert projects_response.status_code == 200
+    assert projects_response.json()[0]["draft_id"] == session["id"]
+
+    open_response = client.get(f"/api/projects/{project['id']}/session")
+    assert open_response.status_code == 200
+    assert open_response.json()["id"] == session["id"]
+
+
+def test_api_revises_saved_project_with_entity_mentions(tmp_path):
+    review_path = tmp_path / "reviews"
+    project_path = tmp_path / "projects"
+    client = TestClient(
+        create_app(
+            store=ReviewStore(review_path),
+            project_store=ProjectStore(project_path),
+        )
+    )
+
+    project = client.post("/api/projects", json={"name": "Retirement Ops"}).json()
+    session = client.post("/api/ontology/drafts/samples/retirements").json()
+    client.post(f"/api/projects/{project['id']}/save", json={"draft_id": session["id"]})
+
+    relationship_response = client.post(
+        f"/api/projects/{project['id']}/revise",
+        json={
+            "draft_id": session["id"],
+            "instruction": "@Member owns one or more @Account",
+            "mentions": [
+                {"id": "member", "label": "Member", "token": "@Member"},
+                {"id": "account", "label": "Account", "token": "@Account"},
+            ],
+        },
+    )
+
+    assert relationship_response.status_code == 200
+    relationship_result = relationship_response.json()
+    assert relationship_result["intent"] == "add_relationship"
+    relationship_session = relationship_result["session"]
+    added_relationship = relationship_session["draft"]["relationships"][-1]
+    assert added_relationship["label"] == "owns"
+    assert added_relationship["cardinality"]["text"] == "one or more"
+    assert relationship_session["statements"][-1]["statement"]["text"] == (
+        "A Member owns one or more Accounts."
+    )
+    assert relationship_result["project"]["statement_count"] == 9
+
+    rule_response = client.post(
+        f"/api/projects/{project['id']}/revise",
+        json={
+            "draft_id": session["id"],
+            "instruction": "@Member must have at least one @Beneficiary",
+            "mentions": [
+                {"id": "member", "label": "Member", "token": "@Member"},
+                {"id": "beneficiary", "label": "Beneficiary", "token": "@Beneficiary"},
+            ],
+        },
+    )
+
+    assert rule_response.status_code == 200
+    rule_result = rule_response.json()
+    assert rule_result["intent"] == "add_rule"
+    rule_session = rule_result["session"]
+    added_rule = rule_session["draft"]["rules"][-1]
+    assert added_rule["applies_to_entity_id"] == "member"
+    assert added_rule["operator"] == "min_count"
+    assert added_rule["value"] == 1
+    assert added_rule["value_entity_id"] == "beneficiary"
+    assert rule_session["statements"][-1]["statement"]["text"] == (
+        "A Member must have at least one Beneficiary."
+    )
+    assert rule_result["project"]["statement_count"] == 10
+
+    saved_path = project_path / "retirement-ops"
+    assert "A Member owns one or more Accounts." in (saved_path / "statements.md").read_text()
+    assert "A Member must have at least one Beneficiary." in (
+        saved_path / "statements.md"
+    ).read_text()
+
+
+def test_api_revises_saved_project_with_entity_expansion_instruction(tmp_path):
+    review_path = tmp_path / "reviews"
+    project_path = tmp_path / "projects"
+    captured_modes = []
+
+    def fake_expand_entity(_session, entity, _instruction, mode):
+        captured_modes.append(mode)
+        return [
+            StatementCreateRequest(
+                kind="relationship",
+                subject=EntityReferenceRequest(id=entity.id),
+                predicate_label="has",
+                object=EntityReferenceRequest(
+                    label="Member Identifier",
+                    entity_type="external_reference",
+                    description="Stable identifier for a member.",
+                ),
+                relationship_type="association",
+                cardinality=Cardinality(min_count=1, max_count=1, text="exactly one"),
+            ),
+            StatementCreateRequest(
+                kind="relationship",
+                subject=EntityReferenceRequest(id=entity.id),
+                predicate_label="has",
+                object=EntityReferenceRequest(
+                    label="Member Status",
+                    entity_type="state",
+                    description="Lifecycle state for a member.",
+                ),
+                relationship_type="lifecycle",
+                cardinality=Cardinality(min_count=1, max_count=1, text="exactly one"),
+            ),
+        ]
+
+    client = TestClient(
+        create_app(
+            store=ReviewStore(review_path),
+            project_store=ProjectStore(project_path),
+            expand_entity=fake_expand_entity,
+        )
+    )
+
+    project = client.post("/api/projects", json={"name": "Cricket Scoring"}).json()
+    session = client.post("/api/ontology/drafts/samples/retirements").json()
+    client.post(f"/api/projects/{project['id']}/save", json={"draft_id": session["id"]})
+
+    response = client.post(
+        f"/api/projects/{project['id']}/revise",
+        json={
+            "draft_id": session["id"],
+            "instruction": "@Member Expand on this entity to cover more",
+            "mentions": [{"id": "member", "label": "Member", "token": "@Member"}],
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["intent"] == "expand_entity"
+    assert result["message"] == "Added 2 ontology expansion statements for Member."
+    assert captured_modes == ["ontology"]
+    assert result["project"]["statement_count"] == 10
+    expanded_session = result["session"]
+    added_statements = expanded_session["statements"][-2:]
+    assert {review["status"] for review in added_statements} == {"pending"}
+    assert added_statements[0]["statement"]["text"] == (
+        "A Member has exactly one Member Identifier."
+    )
+    assert added_statements[1]["statement"]["text"] == (
+        "A Member has exactly one Member Status."
+    )
+    assert any(
+        entity["label"] == "Member Identifier"
+        for entity in expanded_session["draft"]["entities"]
+    )
+
+    saved_path = project_path / "cricket-scoring"
+    assert "A Member has exactly one Member Identifier." in (
+        saved_path / "statements.md"
+    ).read_text()
+    assert (saved_path / "entities" / "member-identifier.md").exists()
+
+
+def test_api_routes_saved_project_rule_expansion_through_agent(tmp_path):
+    review_path = tmp_path / "reviews"
+    project_path = tmp_path / "projects"
+    captured_modes = []
+
+    def fake_expand_entity(_session, entity, _instruction, mode):
+        captured_modes.append(mode)
+        return [
+            StatementCreateRequest(
+                kind="rule",
+                applies_to=EntityReferenceRequest(id=entity.id),
+                rule_type="validation",
+                severity="should",
+                predicate_label="have a review status",
+                operator="exists",
+                statement_text="A Member should have a review status.",
+            )
+        ]
+
+    client = TestClient(
+        create_app(
+            store=ReviewStore(review_path),
+            project_store=ProjectStore(project_path),
+            expand_entity=fake_expand_entity,
+        )
+    )
+
+    project = client.post("/api/projects", json={"name": "Cricket Scoring"}).json()
+    session = client.post("/api/ontology/drafts/samples/retirements").json()
+    client.post(f"/api/projects/{project['id']}/save", json={"draft_id": session["id"]})
+
+    response = client.post(
+        f"/api/projects/{project['id']}/revise",
+        json={
+            "draft_id": session["id"],
+            "instruction": "@Member expand rules for review quality",
+            "mentions": [{"id": "member", "label": "Member", "token": "@Member"}],
+        },
+    )
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["intent"] == "expand_entity"
+    assert result["message"] == "Added 1 rule expansion statements for Member."
+    assert captured_modes == ["rules"]
+    assert result["session"]["statements"][-1]["statement"]["kind"] == "rule"
+    assert result["session"]["statements"][-1]["statement"]["text"] == (
+        "A Member should have a review status."
+    )
+
+
+def test_api_rejects_unknown_project_revision_mentions(tmp_path):
+    review_path = tmp_path / "reviews"
+    project_path = tmp_path / "projects"
+    client = TestClient(
+        create_app(
+            store=ReviewStore(review_path),
+            project_store=ProjectStore(project_path),
+        )
+    )
+
+    project = client.post("/api/projects", json={"name": "Retirement Ops"}).json()
+    session = client.post("/api/ontology/drafts/samples/retirements").json()
+    client.post(f"/api/projects/{project['id']}/save", json={"draft_id": session["id"]})
+
+    response = client.post(
+        f"/api/projects/{project['id']}/revise",
+        json={
+            "draft_id": session["id"],
+            "instruction": "@Unknown owns @Account",
+            "mentions": [{"id": "unknown", "label": "Unknown", "token": "@Unknown"}],
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Unknown entity mention id" in response.json()["detail"]
