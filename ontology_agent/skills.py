@@ -19,6 +19,14 @@ CORE_SKILL_SEQUENCE = [
     "ontology-json-export",
 ]
 
+ENTITY_EXPANSION_SKILL_SEQUENCE = [
+    "ontology-entity-expansion",
+    "ontology-concept-gathering",
+    "ontology-relationship-design",
+    "ontology-rule-design",
+    "ontology-statement-rendering",
+]
+
 
 @dataclass(frozen=True)
 class SkillMetadata:
@@ -105,29 +113,11 @@ def plan_ontology_skills(domain: str, scope: str | None, skills_dir: Path) -> st
     )
 
 
-def load_skill_text(skills_dir: Path, skill_name: str) -> str:
-    safe_name = skill_name.strip().lower()
-    skill_file = skills_dir / safe_name / "SKILL.md"
-    if not skill_file.exists():
-        available = ", ".join(skill.name for skill in discover_skills(skills_dir)) or "none"
-        return f"Skill '{skill_name}' was not found. Available skills: {available}."
+def build_native_agno_skills(skills_dir: Path):
+    """Build Agno's native Skills object from local SKILL.md folders."""
+    from agno.skills import LocalSkills, Skills
 
-    metadata, body = _split_frontmatter(skill_file.read_text())
-    title = metadata.get("name", safe_name)
-    description = metadata.get("description", "")
-    return f"# {title}\n\n{description}\n\n{body}"
-
-
-def build_skill_context(domain: str, scope: str | None, skills_dir: Path) -> str:
-    plan = json.loads(plan_ontology_skills(domain, scope, skills_dir))
-    sections = [
-        "# Ontology Skill Orchestration Plan",
-        json.dumps(plan, indent=2),
-        "# Loaded Skills",
-    ]
-    for skill_name in plan["skill_sequence"]:
-        sections.append(load_skill_text(skills_dir, skill_name))
-    return "\n\n".join(sections)
+    return Skills(loaders=[LocalSkills(str(skills_dir))])
 
 
 def _match_extension_skills(

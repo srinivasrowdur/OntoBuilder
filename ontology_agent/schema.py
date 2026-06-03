@@ -38,9 +38,13 @@ class OntologyRequest(BaseModel):
     max_relationships: int = Field(default=45, ge=5, le=120)
     include_rules: bool = True
     include_competency_questions: bool = True
-    skill_context: str | None = Field(
-        default=None,
-        description="System-provided loaded skill context for this request.",
+    skill_sequence: list[str] = Field(
+        default_factory=list,
+        description="Native Agno skill names to load with get_skill_instructions before drafting.",
+    )
+    extension_skills: list[str] = Field(
+        default_factory=list,
+        description="Domain or overlay skills selected for this request.",
     )
 
 

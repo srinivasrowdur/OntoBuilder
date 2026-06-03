@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 import io
+import json
 import re
 from typing import Any
 
@@ -10,7 +11,7 @@ from ontology_agent.agent import build_ontology_agent
 from ontology_agent.config import AgentConfig, load_config
 from ontology_agent.repair import repair_ontology_draft_payload
 from ontology_agent.schema import OntologyDraft, OntologyRequest
-from ontology_agent.skills import build_skill_context
+from ontology_agent.skills import plan_ontology_skills
 
 
 @dataclass(frozen=True)
@@ -34,14 +35,15 @@ def build_draft_from_prompt(
     parsed_request = parse_freeform_request(prompt)
     domain = parsed_request["domain"]
     resolved_scope = scope or parsed_request["scope"]
-    skill_context = build_skill_context(domain, resolved_scope, config.skills_dir)
+    skill_plan = json.loads(plan_ontology_skills(domain, resolved_scope, config.skills_dir))
     runtime_logs = io.StringIO()
     request = OntologyRequest(
         domain=domain,
         scope=resolved_scope,
         jurisdiction=jurisdiction,
         request_text=prompt,
-        skill_context=skill_context,
+        skill_sequence=skill_plan["skill_sequence"],
+        extension_skills=skill_plan["extension_skills"],
     )
 
     with redirect_stdout(runtime_logs), redirect_stderr(runtime_logs):
@@ -50,8 +52,6 @@ def build_draft_from_prompt(
             input=request,
             user_id=user_id or config.user_id,
             session_id=session_id or config.session_id,
-            dependencies={"ontology_skill_context": skill_context},
-            add_dependencies_to_context=True,
         )
 
     return OntologyRunResult(

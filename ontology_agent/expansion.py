@@ -19,7 +19,7 @@ from ontology_agent.review import (
     StatementCreateRequest,
 )
 from ontology_agent.schema import Cardinality, Entity, Relationship, Rule
-from ontology_agent.skills import load_skill_text
+from ontology_agent.skills import ENTITY_EXPANSION_SKILL_SEQUENCE, build_native_agno_skills
 from ontology_agent.review import DraftReviewSession
 
 
@@ -67,7 +67,7 @@ class EntityExpansionRequest(BaseModel):
     existing_relationships: list[RelationshipSnapshot]
     existing_rules: list[RuleSnapshot]
     existing_statements: list[str]
-    skill_context: str
+    skill_sequence: list[str]
     max_relationships: int = Field(default=8, ge=0, le=12)
     max_rules: int = Field(default=4, ge=0, le=8)
 
@@ -145,8 +145,6 @@ def build_entity_expansion(
             input=request,
             user_id=config.user_id,
             session_id=f"{config.session_id}-entity-expansion",
-            dependencies={"ontology_skill_context": request.skill_context},
-            add_dependencies_to_context=True,
         )
 
     plan = _response_to_expansion_plan(response.content)
@@ -174,6 +172,8 @@ def _build_entity_expansion_agent(config: AgentConfig) -> Any:
         ),
         "instructions": [
             "You are an ontology entity-expansion specialist.",
+            "Use Agno native skills from the local skills folder; skills are loaded with get_skill_instructions.",
+            "Before proposing candidates, call get_skill_instructions for each skill in request.skill_sequence in order.",
             "Use the supplied current ontology as the boundary and source of truth.",
             "The user is not asking for prose notes. Propose new ontology candidates.",
             "Return only the structured output requested by the output schema.",
@@ -195,6 +195,9 @@ def _build_entity_expansion_agent(config: AgentConfig) -> Any:
         "telemetry": config.telemetry,
         "debug_mode": config.debug,
     }
+    if "skills" not in agent_params:
+        raise RuntimeError("Installed Agno Agent does not support native skills.")
+    agent_kwargs["skills"] = build_native_agno_skills(config.skills_dir)
     return Agent(**{key: value for key, value in agent_kwargs.items() if key in agent_params})
 
 
@@ -206,15 +209,6 @@ def _entity_expansion_request(
     config: AgentConfig,
 ) -> EntityExpansionRequest:
     entity_labels = {candidate.id: candidate.label for candidate in session.draft.entities}
-    skill_context = "\n\n".join(
-        [
-            load_skill_text(config.skills_dir, "ontology-entity-expansion"),
-            load_skill_text(config.skills_dir, "ontology-concept-gathering"),
-            load_skill_text(config.skills_dir, "ontology-relationship-design"),
-            load_skill_text(config.skills_dir, "ontology-rule-design"),
-            load_skill_text(config.skills_dir, "ontology-statement-rendering"),
-        ]
-    )
     return EntityExpansionRequest(
         domain=session.draft.domain,
         scope=session.draft.scope,
@@ -228,7 +222,7 @@ def _entity_expansion_request(
         ],
         existing_rules=[_rule_snapshot(rule, entity_labels) for rule in session.draft.rules],
         existing_statements=[review.statement.text for review in session.statements],
-        skill_context=skill_context,
+        skill_sequence=ENTITY_EXPANSION_SKILL_SEQUENCE,
         max_relationships=0 if mode == "rules" else 8,
         max_rules=0 if mode == "relationships" else 4,
     )

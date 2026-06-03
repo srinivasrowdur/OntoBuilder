@@ -11,7 +11,7 @@ from rdflib.namespace import RDFS, SKOS
 from ontology_agent.config import ROOT
 from ontology_agent.repair import repair_ontology_draft_payload
 from ontology_agent.schema import OntologyDraft
-from ontology_agent.skills import build_skill_index, load_skill_text, plan_ontology_skills
+from ontology_agent.skills import build_skill_index, plan_ontology_skills
 
 
 PROJECT_KNOWLEDGE_FILES = (
@@ -143,11 +143,7 @@ def make_skill_tools(skills_dir: Path):
         """List local ontology skills available to the agent."""
         return build_skill_index(skills_dir)
 
-    def load_ontology_skill(skill_name: str) -> str:
-        """Load detailed instructions for a local ontology skill by name."""
-        return load_skill_text(skills_dir, skill_name)
-
-    return [plan_ontology_skill_sequence, list_ontology_skills, load_ontology_skill]
+    return [plan_ontology_skill_sequence, list_ontology_skills]
 
 
 def make_save_learning_tool(knowledge: Any | None):

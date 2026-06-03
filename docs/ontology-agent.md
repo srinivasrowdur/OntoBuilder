@@ -2,7 +2,7 @@
 
 This repo now includes a small Agno-oriented ontology-building agent. It turns a domain prompt such as `retirements` into parseable JSON containing entities, relationships, rules, natural-language statements, assumptions, and competency questions.
 
-The agent is intentionally skill-driven internally, but users do not need to know about skills. A user can ask for any domain directly. The base agent orchestrates generic ontology workflow skills and optionally loads domain-specific skills when developers add them.
+The agent is intentionally skill-driven internally, but users do not need to know about skills. A user can ask for any domain directly. The base agent uses Agno's native `Skills(loaders=[LocalSkills(...)])` support to load folder-based `SKILL.md` packages, then orchestrates generic ontology workflow skills and optional domain-specific skills.
 
 The design follows the screenshot pattern:
 
@@ -22,7 +22,7 @@ The CLI also runs a deterministic repair pass before printing output, so omitted
 ## Architecture
 
 - `ontology_agent/schema.py`: Pydantic input and output schemas.
-- `ontology_agent/agent.py`: Agno agent construction with memory, history limits, session summaries, compression, tools, optional vector knowledge, and skill loading.
+- `ontology_agent/agent.py`: Agno agent construction with memory, history limits, session summaries, compression, tools, optional vector knowledge, and native folder-based skill loading.
 - `ontology_agent/tools.py`: local knowledge search, existing ontology search, draft validation, skill tools, and guarded learning persistence.
 - `ontology_agent/repair.py`: deterministic statement coverage repair before final JSON output.
 - `ontology_agent/skills/`: extendable skill folders using Agno-style `SKILL.md` files.
@@ -87,7 +87,11 @@ Core routes:
 
 ## Internal Skill Workflow
 
-The core workflow is split into discrete skills:
+The core workflow is split into discrete Agno skills. Each skill lives in its
+own folder under `ontology_agent/skills/<skill-name>/SKILL.md`; the agent does
+not pre-concatenate those files into one prompt. It passes a planned skill
+sequence to the request and uses Agno's `get_skill_instructions` tool to load
+the relevant folder instructions during the run.
 
 - `ontology-scope-control`: keeps the requested domain primary and treats scope as a lens.
 - `ontology-domain-discovery`: builds a useful starter ontology for any requested domain, even when no specialist skill exists.

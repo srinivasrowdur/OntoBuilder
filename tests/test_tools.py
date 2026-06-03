@@ -4,7 +4,9 @@ from ontology_agent.config import ROOT
 from ontology_agent.repair import repair_ontology_draft_payload
 from ontology_agent.schema import OntologyDraft
 from ontology_agent.service import parse_freeform_request
-from ontology_agent.skills import build_skill_context, plan_ontology_skills
+from agno.skills import LocalSkills, Skills
+
+from ontology_agent.skills import plan_ontology_skills
 from ontology_agent.tools import make_identifier, validate_ontology_draft_json
 
 
@@ -132,13 +134,11 @@ def test_repair_drops_unknown_competency_question_relationships():
     )
 
 
-def test_skill_context_loads_planned_skills_in_order():
-    context = build_skill_context(
-        "retirements",
-        "Contract Management",
-        ROOT / "ontology_agent" / "skills",
-    )
+def test_local_skill_folders_load_with_native_agno_skills():
+    skills = Skills(loaders=[LocalSkills(str(ROOT / "ontology_agent" / "skills"))])
 
-    assert context.index("# retirement-ontology") < context.index("# contract-management-ontology")
-    assert context.index("# retirement-ontology") < context.index("# ontology-concept-gathering")
-    assert "The domain is primary" in context
+    assert "ontology-concept-gathering" in skills.get_skill_names()
+    assert "retirement-ontology" in skills.get_skill_names()
+    assert skills.get_skill("retirement-ontology").instructions.startswith(
+        "# Retirement Ontology Skill"
+    )

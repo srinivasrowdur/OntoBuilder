@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Agno-based ontology drafting agent with structured JSON output."
 requires-python = ">=3.11"
 dependencies = [
-    "agno>=2.3.4",
+    "agno>=2.6.9",
     "fastapi>=0.136",
     "google-genai>=1.0",
     "openai>=2.0.0",

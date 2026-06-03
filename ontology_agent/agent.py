@@ -6,7 +6,7 @@ from typing import Any
 from ontology_agent.config import AgentConfig, load_config
 from ontology_agent.knowledge import build_vector_knowledge
 from ontology_agent.schema import OntologyDraft, OntologyRequest
-from ontology_agent.skills import build_skill_index
+from ontology_agent.skills import build_native_agno_skills
 from ontology_agent.tools import (
     make_save_learning_tool,
     make_skill_tools,
@@ -20,9 +20,9 @@ from ontology_agent.tools import (
 
 BASE_INSTRUCTIONS = [
     "You are an ontology skill orchestrator.",
-    "Before drafting, call plan_ontology_skill_sequence with the user's domain and scope.",
-    "Load and follow each skill in the returned skill_sequence.",
-    "If ontology skill context is supplied as a dependency, treat it as the governing workflow.",
+    "Use Agno native skills from the local skills folder; skills are loaded with get_skill_instructions.",
+    "If the input includes skill_sequence, call get_skill_instructions for each skill in that order before drafting.",
+    "If skill_sequence is empty, call plan_ontology_skill_sequence with the user's domain and scope, then call get_skill_instructions for each returned skill.",
     "If the request includes request_text, use it to understand the user's intent while keeping the extracted domain as the output domain.",
     "Treat the domain as primary and the scope as a lens or boundary.",
     "Return only the structured output requested by the output schema.",
@@ -86,20 +86,13 @@ def build_ontology_agent(config: AgentConfig | None = None) -> Any:
     else:
         agent_kwargs["search_knowledge"] = False
 
-    additional_context = [
-        build_skill_index(config.skills_dir),
-        "Use list_ontology_skills and load_ontology_skill if native Agno Skills are not available.",
-    ]
+    additional_context = []
     if knowledge_warning:
         additional_context.append(knowledge_warning)
 
-    if "skills" in agent_params:
-        try:  # pragma: no cover - depends on installed Agno version
-            from agno.skills import LocalSkills, Skills
-
-            agent_kwargs["skills"] = Skills(loaders=[LocalSkills(str(config.skills_dir))])
-        except Exception as exc:
-            additional_context.append(f"Native Agno Skills unavailable: {exc}")
+    if "skills" not in agent_params:
+        raise RuntimeError("Installed Agno Agent does not support native skills.")
+    agent_kwargs["skills"] = build_native_agno_skills(config.skills_dir)
 
     agent_kwargs["additional_context"] = "\n\n".join(additional_context)
 
