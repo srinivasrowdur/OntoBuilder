@@ -15,7 +15,13 @@
   --line: rgba(214, 224, 244, 0.1);
   color-scheme: dark;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -234,9 +240,7 @@ button:disabled {
   gap: 0.78rem;
   width: min(22rem, calc(100vw - 2.5rem));
   border-right: 1px solid rgba(214, 224, 244, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 11rem),
-    #0c0e14;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 11rem), #0c0e14;
   padding: 0.78rem;
   box-shadow: 1rem 0 3rem rgba(0, 0, 0, 0.42);
   pointer-events: auto;
@@ -544,7 +548,13 @@ button:disabled {
   border-radius: 999px;
   padding: 0.16rem 0.45rem;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-size: 0.68rem;
   font-weight: 820;
   line-height: 1;
@@ -670,6 +680,28 @@ button:disabled {
   animation: spin 850ms linear infinite;
 }
 
+.graph-error {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  place-content: center;
+  gap: 0.45rem;
+  padding: 1.5rem;
+  color: #dbe6f8;
+  text-align: center;
+}
+
+.graph-error strong {
+  color: #f8d488;
+  font-size: 0.95rem;
+}
+
+.graph-error span {
+  color: #aab4c8;
+  font-size: 0.82rem;
+}
+
 .empty-graph {
   min-height: 14rem;
   place-items: center;
@@ -749,7 +781,13 @@ button:disabled {
   padding: 0.01em 0.42em 0.06em;
   border-radius: 0.38em;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-weight: 760;
   line-height: 1.05;
   white-space: nowrap;
@@ -804,7 +842,13 @@ button:disabled {
   min-height: 1.58em;
   border-radius: 0.38em;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   font-size: 0.82em;
   font-weight: 760;
   line-height: 1.05;
@@ -878,9 +922,7 @@ button:disabled {
   display: grid;
   gap: 0.58rem;
   border-top: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(8, 9, 13, 0.62), rgba(8, 9, 13, 0.96) 34%),
-    #090b10;
+  background: linear-gradient(180deg, rgba(8, 9, 13, 0.62), rgba(8, 9, 13, 0.96) 34%), #090b10;
   padding: 0.72rem 1.65rem 0.86rem;
   box-shadow: 0 -1rem 2.4rem rgba(0, 0, 0, 0.26);
 }
@@ -901,9 +943,7 @@ button:disabled {
   max-width: none;
   border-color: rgba(214, 224, 244, 0.18);
   border-radius: 0.95rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%),
-    #10141d;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 70%), #10141d;
   padding: 0.64rem;
   box-shadow:
     0 2.2rem 5rem rgba(0, 0, 0, 0.34),
@@ -989,9 +1029,7 @@ button:disabled {
   overflow: auto;
   border: 1px solid rgba(123, 169, 244, 0.28);
   border-radius: 0.52rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 5rem),
-    #0d121c;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 5rem), #0d121c;
   padding: 0.28rem;
   box-shadow:
     0 0.85rem 2rem rgba(0, 0, 0, 0.38),
@@ -1083,9 +1121,7 @@ button:disabled {
   max-height: 100vh;
   overflow: auto;
   border-left: 1px solid var(--line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 12rem),
-    #0c0e14;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 12rem), #0c0e14;
   padding: 0.72rem;
   scrollbar-width: thin;
 }
@@ -1281,9 +1317,7 @@ select {
 .inspector-card {
   gap: 0.88rem;
   padding: 0.84rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 8rem),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 8rem), var(--panel);
 }
 
 .entity-inspector-header {

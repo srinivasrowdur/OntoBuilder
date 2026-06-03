@@ -45,11 +45,7 @@ interface StatementComposerProps {
   onCreateStatement: (payload: StatementCreatePayload) => Promise<void>;
 }
 
-export function StatementComposer({
-  draft,
-  onCancel,
-  onCreateStatement,
-}: StatementComposerProps) {
+export function StatementComposer({ draft, onCancel, onCreateStatement }: StatementComposerProps) {
   const [mode, setMode] = useState<ComposerMode>("relationship");
   const [subject, setSubject] = useState<EntityChoice>(() => initialEntityChoice(draft, 0));
   const [object, setObject] = useState<EntityChoice>(() => initialEntityChoice(draft, 1));
@@ -183,9 +179,7 @@ export function StatementComposer({
             <select
               aria-label="Rule severity"
               className="inline-chip-select constraint"
-              onChange={(event) =>
-                setSeverity(event.target.value as "must" | "should" | "may")
-              }
+              onChange={(event) => setSeverity(event.target.value as "must" | "should" | "may")}
               value={severity}
             >
               <option value="must">must</option>
@@ -275,9 +269,7 @@ function EntityPicker({
           <input
             aria-label="New entity name"
             className="inline-entity-input"
-            onChange={(event) =>
-              onChange({ ...value, label: event.target.value })
-            }
+            onChange={(event) => onChange({ ...value, label: event.target.value })}
             placeholder="Entity"
             value={value.label}
           />

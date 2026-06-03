@@ -17,11 +17,16 @@ import {
 import { OntologyCanvas } from "./components/OntologyCanvas";
 import { ReviewSidebar } from "./components/ReviewSidebar";
 import { draftForDisplay, getReviewCounts } from "./ontology";
+import {
+  applyPreviewOverrides,
+  extractPromptMentions,
+  omitKey,
+  setPreviewValue,
+} from "./reviewState";
 import type {
   CommitResponse,
   DraftReviewSession,
   Entity,
-  MentionReference,
   OntologyDraft,
   ProjectSummary,
   ReviewStatus,
@@ -65,13 +70,19 @@ export function App() {
     if (!draft) {
       return null;
     }
-    return draft.entities.find((entity) => entity.id === selectedEntityId) ?? draft.entities[0] ?? null;
+    return (
+      draft.entities.find((entity) => entity.id === selectedEntityId) ?? draft.entities[0] ?? null
+    );
   }, [draft, selectedEntityId]);
   const selectedSavedEntity = useMemo(() => {
     if (!baseDraft) {
       return null;
     }
-    return baseDraft.entities.find((entity) => entity.id === selectedEntityId) ?? baseDraft.entities[0] ?? null;
+    return (
+      baseDraft.entities.find((entity) => entity.id === selectedEntityId) ??
+      baseDraft.entities[0] ??
+      null
+    );
   }, [baseDraft, selectedEntityId]);
 
   useEffect(() => {
@@ -156,12 +167,7 @@ export function App() {
     setProjectMessage(null);
     try {
       const mentions = extractPromptMentions(instruction, session.draft.entities);
-      const response = await reviseProject(
-        selectedProjectId,
-        session.id,
-        instruction,
-        mentions,
-      );
+      const response = await reviseProject(selectedProjectId, session.id, instruction, mentions);
       setReviewSession(response.session);
       if (response.intent === "add_relationship" || response.intent === "add_rule") {
         setSelectedStatementId(response.session.statements.at(-1)?.statement.id ?? null);
@@ -410,7 +416,7 @@ export function App() {
     }
     setSelectedStatementId((currentId) => {
       const statementIds = nextSession.statements.map((review) => review.statement.id);
-      return currentId && statementIds.includes(currentId) ? currentId : statementIds[0] ?? null;
+      return currentId && statementIds.includes(currentId) ? currentId : (statementIds[0] ?? null);
     });
   }
 
@@ -467,7 +473,12 @@ function errorMessage(error: unknown) {
 }
 
 function slug(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ontology";
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "ontology"
+  );
 }
 
 function projectNameFromDraft(draft: OntologyDraft) {
@@ -480,7 +491,11 @@ function titleCaseWords(value: string) {
     .replace(/\s+/g, " ")
     .trim()
     .split(" ")
-    .map((word) => (word.length <= 3 && word === word.toUpperCase() ? word : word.charAt(0).toUpperCase() + word.slice(1)))
+    .map((word) =>
+      word.length <= 3 && word === word.toUpperCase()
+        ? word
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
     .join(" ")
     .slice(0, 80);
 }
@@ -490,143 +505,4 @@ function upsertProject(projects: ProjectSummary[], nextProject: ProjectSummary) 
   return [nextProject, ...existing].sort((left, right) =>
     right.updated_at.localeCompare(left.updated_at),
   );
-}
-
-function extractPromptMentions(
-  instruction: string,
-  entities: Entity[],
-): MentionReference[] {
-  const matches: Array<{
-    entity: Entity;
-    end: number;
-    start: number;
-    token: string;
-  }> = [];
-
-  for (const entity of entities) {
-    const tokens = [`@${entity.label}`, `@${entity.id}`, ...entity.aliases.map((alias) => `@${alias}`)];
-    for (const token of tokens.filter(Boolean)) {
-      const pattern = new RegExp(escapeRegExp(token), "gi");
-      for (const match of instruction.matchAll(pattern)) {
-        const start = match.index ?? -1;
-        if (start < 0) {
-          continue;
-        }
-        matches.push({
-          entity,
-          end: start + match[0].length,
-          start,
-          token: match[0],
-        });
-      }
-    }
-  }
-
-  const selected: typeof matches = [];
-  for (const match of matches.sort((left, right) => {
-    const startDelta = left.start - right.start;
-    return startDelta || right.token.length - left.token.length;
-  })) {
-    if (selected.some((item) => !(match.end <= item.start || match.start >= item.end))) {
-      continue;
-    }
-    selected.push(match);
-  }
-
-  return selected.map((match) => ({
-    id: match.entity.id,
-    label: match.entity.label,
-    token: match.token,
-  }));
-}
-
-function applyPreviewOverrides(
-  draft: OntologyDraft | null,
-  entityLabelPreviews: Record<string, string>,
-  statementTextPreviews: Record<string, string>,
-): OntologyDraft | null {
-  if (!draft) {
-    return null;
-  }
-
-  const entityEntries = Object.entries(entityLabelPreviews).filter(([, label]) => label.trim());
-  const statementEntries = Object.entries(statementTextPreviews).filter(([, text]) => text.trim());
-  if (entityEntries.length === 0 && statementEntries.length === 0) {
-    return draft;
-  }
-
-  let nextStatements = draft.statements;
-  let nextRules = draft.rules;
-  const nextEntities = draft.entities.map((entity) => {
-    const nextLabel = entityLabelPreviews[entity.id]?.trim();
-    return nextLabel ? { ...entity, label: nextLabel } : entity;
-  });
-
-  for (const [entityId, nextLabel] of entityEntries) {
-    const entity = draft.entities.find((candidate) => candidate.id === entityId);
-    if (!entity || entity.label === nextLabel) {
-      continue;
-    }
-    nextStatements = nextStatements.map((statement) => ({
-      ...statement,
-      text: replaceEntityLabel(statement.text, entity.label, nextLabel),
-    }));
-    nextRules = nextRules.map((rule) => ({
-      ...rule,
-      text: replaceEntityLabel(rule.text, entity.label, nextLabel),
-    }));
-  }
-
-  if (statementEntries.length > 0) {
-    const statementPreviewMap = new Map(statementEntries);
-    nextStatements = nextStatements.map((statement) => {
-      const nextText = statementPreviewMap.get(statement.id)?.trim();
-      return nextText ? { ...statement, text: nextText } : statement;
-    });
-  }
-
-  return {
-    ...draft,
-    entities: nextEntities,
-    rules: nextRules,
-    statements: nextStatements,
-  };
-}
-
-function setPreviewValue(
-  current: Record<string, string>,
-  id: string,
-  value: string | null,
-) {
-  if (value === null) {
-    return omitKey(current, id);
-  }
-  return { ...current, [id]: value };
-}
-
-function omitKey(current: Record<string, string>, id: string) {
-  if (!(id in current)) {
-    return current;
-  }
-  const { [id]: _removed, ...next } = current;
-  return next;
-}
-
-function replaceEntityLabel(text: string, oldLabel: string, newLabel: string) {
-  let nextText = text;
-  if (!oldLabel.toLowerCase().endsWith("s")) {
-    nextText = nextText.replace(
-      new RegExp(`\\b${escapeRegExp(oldLabel)}s\\b`, "gi"),
-      pluralizeLabel(newLabel),
-    );
-  }
-  return nextText.replace(new RegExp(`\\b${escapeRegExp(oldLabel)}\\b`, "gi"), newLabel);
-}
-
-function pluralizeLabel(label: string) {
-  return label.toLowerCase().endsWith("s") ? label : `${label}s`;
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

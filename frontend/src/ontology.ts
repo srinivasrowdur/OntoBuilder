@@ -48,7 +48,10 @@ export function getReadiness(draft: OntologyDraft | null) {
     return { readiness: 0, blockingIssues: 0 };
   }
   const blockingIssues = Math.min(2, draft.open_questions.length);
-  const readiness = Math.max(70, 98 - blockingIssues * 3 - Math.max(1, Math.floor(draft.assumptions.length / 2)));
+  const readiness = Math.max(
+    70,
+    98 - blockingIssues * 3 - Math.max(1, Math.floor(draft.assumptions.length / 2)),
+  );
   return { readiness, blockingIssues };
 }
 
@@ -90,5 +93,7 @@ export function statementStatus(
   session: DraftReviewSession | null,
   statement: NaturalLanguageStatement,
 ): ReviewStatus {
-  return session?.statements.find((review) => review.statement.id === statement.id)?.status ?? "pending";
+  return (
+    session?.statements.find((review) => review.statement.id === statement.id)?.status ?? "pending"
+  );
 }

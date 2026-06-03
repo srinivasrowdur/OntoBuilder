@@ -12,31 +12,64 @@ import type {
 
 const API_BASE_URL =
   import.meta.env.VITE_ONTOLOGY_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+const REQUEST_TIMEOUT_MS = 30_000;
+const SAFE_RETRY_METHODS = new Set(["GET", "HEAD"]);
 
-async function requestJson<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const maxAttempts = SAFE_RETRY_METHODS.has(method) ? 2 : 1;
+  let lastError: unknown = null;
 
-  if (!response.ok) {
-    let detail = response.statusText;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const body = await response.json();
-      detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
-    } catch {
-      detail = await response.text();
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        if (attempt < maxAttempts && response.status >= 500) {
+          continue;
+        }
+        throw await apiResponseError(response);
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      lastError = normalizeRequestError(error);
+      if (attempt >= maxAttempts || !SAFE_RETRY_METHODS.has(method)) {
+        throw lastError;
+      }
+    } finally {
+      globalThis.clearTimeout(timeoutId);
     }
-    throw new Error(`API ${response.status}: ${detail}`);
   }
 
-  return (await response.json()) as T;
+  throw lastError instanceof Error ? lastError : new Error("API request failed");
+}
+
+async function apiResponseError(response: Response) {
+  let detail = response.statusText;
+  try {
+    const body = await response.json();
+    detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+  } catch {
+    detail = await response.text();
+  }
+  return new Error(`API ${response.status}: ${detail}`);
+}
+
+function normalizeRequestError(error: unknown) {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return new Error(`API request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+  }
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 export function createSampleDraft(): Promise<DraftReviewSession> {
@@ -79,13 +112,10 @@ export function bulkReview(
   status: Exclude<ReviewStatus, "edited">,
   statementIds?: Identifier[],
 ): Promise<DraftReviewSession> {
-  return requestJson<DraftReviewSession>(
-    `/api/ontology/drafts/${draftId}/statements/review`,
-    {
-      method: "POST",
-      body: JSON.stringify({ status, statement_ids: statementIds }),
-    },
-  );
+  return requestJson<DraftReviewSession>(`/api/ontology/drafts/${draftId}/statements/review`, {
+    method: "POST",
+    body: JSON.stringify({ status, statement_ids: statementIds }),
+  });
 }
 
 export function getDraft(draftId: string): Promise<DraftReviewSession> {
@@ -113,29 +143,21 @@ export function listProjects(): Promise<ProjectSummary[]> {
   return requestJson<ProjectSummary[]>("/api/projects");
 }
 
-export function createProject(
-  name: string,
-  description?: string,
-): Promise<ProjectSummary> {
+export function createProject(name: string, description?: string): Promise<ProjectSummary> {
   return requestJson<ProjectSummary>("/api/projects", {
     method: "POST",
     body: JSON.stringify({ name, ...(description ? { description } : {}) }),
   });
 }
 
-export function saveProject(
-  projectId: string,
-  draftId: string,
-): Promise<ProjectSaveResponse> {
+export function saveProject(projectId: string, draftId: string): Promise<ProjectSaveResponse> {
   return requestJson<ProjectSaveResponse>(`/api/projects/${projectId}/save`, {
     method: "POST",
     body: JSON.stringify({ draft_id: draftId }),
   });
 }
 
-export function openProjectSession(
-  projectId: string,
-): Promise<DraftReviewSession> {
+export function openProjectSession(projectId: string): Promise<DraftReviewSession> {
   return requestJson<DraftReviewSession>(`/api/projects/${projectId}/session`);
 }
 

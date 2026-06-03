@@ -33,11 +33,7 @@ interface ReviewSidebarProps {
   onPreviewEntityLabel: (entityId: string, label: string | null) => void;
   onPreviewStatementText: (statementId: string, text: string | null) => void;
   onRenameEntity: (entityId: string, label: string) => Promise<void>;
-  onReviewStatement: (
-    statementId: string,
-    status: ReviewStatus,
-    text?: string,
-  ) => Promise<void>;
+  onReviewStatement: (statementId: string, status: ReviewStatus, text?: string) => Promise<void>;
   onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
 }
@@ -123,7 +119,9 @@ function EntityInspector({
           <PanelRight size={16} />
           <span>Entity properties</span>
         </div>
-        <p className="inspector-empty">Select an entity from the text or graph to inspect its structured metadata.</p>
+        <p className="inspector-empty">
+          Select an entity from the text or graph to inspect its structured metadata.
+        </p>
       </section>
     );
   }
@@ -144,20 +142,20 @@ function EntityInspector({
       statement.object_entity_id === entity.id ||
       Boolean(
         statement.relationship_id &&
-          draft.relationships.some(
-            (relationship) =>
-              relationship.id === statement.relationship_id &&
-              (relationship.subject_entity_id === entity.id ||
-                relationship.object_entity_id === entity.id),
-          ),
+        draft.relationships.some(
+          (relationship) =>
+            relationship.id === statement.relationship_id &&
+            (relationship.subject_entity_id === entity.id ||
+              relationship.object_entity_id === entity.id),
+        ),
       ) ||
       Boolean(
         statement.rule_id &&
-          draft.rules.some(
-            (rule) =>
-              rule.id === statement.rule_id &&
-              (rule.applies_to_entity_id === entity.id || rule.value_entity_id === entity.id),
-          ),
+        draft.rules.some(
+          (rule) =>
+            rule.id === statement.rule_id &&
+            (rule.applies_to_entity_id === entity.id || rule.value_entity_id === entity.id),
+        ),
       ),
   );
   const iri = entityIri(draft, entity);
@@ -254,9 +252,7 @@ function EntityInspector({
 
       {entity.aliases.length > 0 || entity.examples.length > 0 ? (
         <InspectorSection icon={<Tags size={15} />} title="Labels">
-          {entity.aliases.length > 0 ? (
-            <ChipRow label="Aliases" values={entity.aliases} />
-          ) : null}
+          {entity.aliases.length > 0 ? <ChipRow label="Aliases" values={entity.aliases} /> : null}
           {entity.examples.length > 0 ? (
             <ChipRow label="Examples" values={entity.examples} />
           ) : null}
@@ -311,11 +307,7 @@ function StatementInspector({
 }: {
   draft: OntologyDraft | null;
   onPreviewStatementText: (statementId: string, text: string | null) => void;
-  onReviewStatement: (
-    statementId: string,
-    status: ReviewStatus,
-    text?: string,
-  ) => Promise<void>;
+  onReviewStatement: (statementId: string, status: ReviewStatus, text?: string) => Promise<void>;
   onSelectEntity: (entityId: string) => void;
   review: StatementReview | null;
 }) {
@@ -339,7 +331,9 @@ function StatementInspector({
           <PanelRight size={16} />
           <span>Statement properties</span>
         </div>
-        <p className="inspector-empty">Select a statement row or graph edge to inspect and edit it.</p>
+        <p className="inspector-empty">
+          Select a statement row or graph edge to inspect and edit it.
+        </p>
       </section>
     );
   }
@@ -436,10 +430,7 @@ function StatementInspector({
           {STATEMENT_STATUS_ACTIONS.map((action) => (
             <button
               className={review.status === action.status ? "active" : ""}
-              disabled={
-                savingAction !== null ||
-                (!textChanged && review.status === action.status)
-              }
+              disabled={savingAction !== null || (!textChanged && review.status === action.status)}
               key={action.status}
               onClick={() => void applyStatement(action.status)}
               type="button"
@@ -450,20 +441,12 @@ function StatementInspector({
         </div>
       </InspectorSection>
 
-      <StatementStructure
-        draft={draft}
-        onSelectEntity={onSelectEntity}
-        statement={statement}
-      />
+      <StatementStructure draft={draft} onSelectEntity={onSelectEntity} statement={statement} />
 
       <InspectorSection icon={<GitBranch size={15} />} title="Impact">
         <div className="impact-list">
           {review.impact.entities.map((reference) => (
-            <button
-              key={reference.id}
-              onClick={() => onSelectEntity(reference.id)}
-              type="button"
-            >
+            <button key={reference.id} onClick={() => onSelectEntity(reference.id)} type="button">
               {reference.label}
             </button>
           ))}
@@ -540,12 +523,20 @@ function RelationshipStructure({
   return (
     <dl className="property-list inspector-structure-list">
       <PropertyItem label="Subject">
-        <EntityLink entity={subject} entityId={statement.subject_entity_id} onSelectEntity={onSelectEntity} />
+        <EntityLink
+          entity={subject}
+          entityId={statement.subject_entity_id}
+          onSelectEntity={onSelectEntity}
+        />
       </PropertyItem>
       <PropertyItem label="Predicate">{relationship?.label ?? statement.predicate}</PropertyItem>
       {statement.object_entity_id ? (
         <PropertyItem label="Object">
-          <EntityLink entity={object} entityId={statement.object_entity_id} onSelectEntity={onSelectEntity} />
+          <EntityLink
+            entity={object}
+            entityId={statement.object_entity_id}
+            onSelectEntity={onSelectEntity}
+          />
         </PropertyItem>
       ) : null}
       <PropertyItem label="Type">{relationship?.relationship_type ?? "relationship"}</PropertyItem>
@@ -573,14 +564,22 @@ function RuleStructure({
   return (
     <dl className="property-list inspector-structure-list">
       <PropertyItem label="Target">
-        <EntityLink entity={subject} entityId={statement.subject_entity_id} onSelectEntity={onSelectEntity} />
+        <EntityLink
+          entity={subject}
+          entityId={statement.subject_entity_id}
+          onSelectEntity={onSelectEntity}
+        />
       </PropertyItem>
       <PropertyItem label="Severity">{rule?.severity ?? "rule"}</PropertyItem>
       <PropertyItem label="Predicate">{rule?.predicate ?? statement.predicate}</PropertyItem>
       <PropertyItem label="Operator">{rule?.operator ?? "exists"}</PropertyItem>
       {valueEntity ? (
         <PropertyItem label="Value">
-          <EntityLink entity={valueEntity} entityId={valueEntity.id} onSelectEntity={onSelectEntity} />
+          <EntityLink
+            entity={valueEntity}
+            entityId={valueEntity.id}
+            onSelectEntity={onSelectEntity}
+          />
         </PropertyItem>
       ) : rule && ruleValuePhrase(rule) ? (
         <PropertyItem label="Value">{ruleValuePhrase(rule)}</PropertyItem>
@@ -599,7 +598,11 @@ function EntityLink({
   onSelectEntity: (entityId: string) => void;
 }) {
   return (
-    <button className="inspector-link-button" onClick={() => onSelectEntity(entityId)} type="button">
+    <button
+      className="inspector-link-button"
+      onClick={() => onSelectEntity(entityId)}
+      type="button"
+    >
       {entity?.label ?? entityId}
     </button>
   );
@@ -649,7 +652,12 @@ function InlineEdit({
           onKeyDown={onKeyDown}
           value={value}
         />
-        <button disabled={!dirty || saving} onClick={() => void onSave()} title={`Save ${label}`} type="button">
+        <button
+          disabled={!dirty || saving}
+          onClick={() => void onSave()}
+          title={`Save ${label}`}
+          type="button"
+        >
           <Check size={14} />
         </button>
         <button
@@ -715,7 +723,12 @@ function InlineTextArea({
           <Check size={14} />
           Save
         </button>
-        <button className="ghost-button" disabled={!dirty || saving} onClick={onRevert} type="button">
+        <button
+          className="ghost-button"
+          disabled={!dirty || saving}
+          onClick={onRevert}
+          type="button"
+        >
           <X size={14} />
           Revert
         </button>
@@ -796,13 +809,15 @@ function RelationshipList({
       <span>{direction === "outgoing" ? "Outgoing" : "Incoming"}</span>
       {relationships.map((relationship) => {
         const relatedEntityId =
-          direction === "outgoing"
-            ? relationship.object_entity_id
-            : relationship.subject_entity_id;
+          direction === "outgoing" ? relationship.object_entity_id : relationship.subject_entity_id;
         const relatedEntity = entityById.get(relatedEntityId);
 
         return (
-          <button key={relationship.id} onClick={() => onSelectEntity(relatedEntityId)} type="button">
+          <button
+            key={relationship.id}
+            onClick={() => onSelectEntity(relatedEntityId)}
+            type="button"
+          >
             <span>{relationship.label}</span>
             <strong>{relatedEntity?.label ?? relatedEntityId}</strong>
           </button>
@@ -840,7 +855,12 @@ function titleCaseIdentifier(value: string) {
 }
 
 function namespacePath(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ontology";
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "ontology"
+  );
 }
 
 function errorMessage(error: unknown) {

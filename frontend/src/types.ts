@@ -1,11 +1,6 @@
 export type Identifier = string;
 
-export type ReviewStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "needs_clarification"
-  | "edited";
+export type ReviewStatus = "pending" | "accepted" | "rejected" | "needs_clarification" | "edited";
 
 export interface Entity {
   id: Identifier;
