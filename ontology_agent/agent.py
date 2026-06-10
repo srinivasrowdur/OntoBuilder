@@ -34,8 +34,35 @@ DRAFT_MODE_INSTRUCTIONS = [
     "deterministic validation and repair run on the server after your response.",
 ]
 
+LIVE_STREAM_INSTRUCTIONS = [
+    "Write your final response as a plain-text outline with exactly one item per line, "
+    "using only these line formats:",
+    "DOMAIN: <domain>",
+    "SUMMARY: <one-sentence summary>",
+    "NAMESPACE: <namespace suggestion>",
+    "ENTITY: <label> | <entity_type> | <one-line description>",
+    "RELATIONSHIP: <subject label> | <predicate> | <object label> | <cardinality phrase>",
+    "RULE: <target entity label> | <severity> | <one-line rule statement>",
+    "STATEMENT: <natural-language statement sentence>",
+    "Emit the DOMAIN, SUMMARY, and NAMESPACE lines first, then every ENTITY line, "
+    "then RELATIONSHIP lines, then RULE lines, then STATEMENT lines.",
+]
 
-def build_ontology_agent(config: AgentConfig | None = None, *, draft_mode: bool = False) -> Any:
+PARSER_MODEL_PROMPT = (
+    "Convert the outline into a single OntologyDraft JSON object. "
+    "Create snake_case ids from labels. Every relationship and rule must reference "
+    "entity ids that exist in the entities array, and every relationship and rule must "
+    "have at least one linked natural-language statement in the statements array. "
+    "Return only the JSON object."
+)
+
+
+def build_ontology_agent(
+    config: AgentConfig | None = None,
+    *,
+    draft_mode: bool = False,
+    live_stream: bool = False,
+) -> Any:
     config = config or load_config()
     config.db_path.parent.mkdir(parents=True, exist_ok=True)
     config.vector_path.mkdir(parents=True, exist_ok=True)
@@ -61,9 +88,12 @@ def build_ontology_agent(config: AgentConfig | None = None, *, draft_mode: bool 
         )
     tools.extend(make_skill_tools(config.skills_dir))
 
+    use_stream_parser = live_stream and bool(config.parser_model)
     instructions = list(BASE_INSTRUCTIONS)
     if draft_mode:
         instructions.extend(DRAFT_MODE_INSTRUCTIONS)
+    if use_stream_parser:
+        instructions.extend(LIVE_STREAM_INSTRUCTIONS)
 
     agent_kwargs: dict[str, Any] = {
         "name": "Ontology Builder",
@@ -86,6 +116,10 @@ def build_ontology_agent(config: AgentConfig | None = None, *, draft_mode: bool 
         "telemetry": config.telemetry,
         "debug_mode": config.debug,
     }
+
+    if use_stream_parser:
+        agent_kwargs["parser_model"] = config.parser_model
+        agent_kwargs["parser_model_prompt"] = PARSER_MODEL_PROMPT
 
     if not draft_mode:
         if "update_memory_on_run" in agent_params:

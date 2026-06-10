@@ -36,6 +36,15 @@ and statement repair then run deterministically on the server
 (`service.response_to_draft` -> `repair_ontology_draft_payload`). This avoids
 re-sending the full draft through the model for validate/repair cycles, which
 dominated generation latency.
+
+The streaming endpoint (`POST /api/ontology/drafts/stream`) additionally passes
+`live_stream=True`, which sets an Agno `parser_model`
+(`ONTOLOGY_AGENT_PARSER_MODEL`, default a cheap provider model, `none` to
+disable). The main model then streams the draft as a line-oriented outline
+(`ENTITY: ... | ... | ...`), `ontology_agent/streaming.py` turns completed
+lines into live SSE progress events (entity chips, running counts), and the
+parser model structures the final outline into the `OntologyDraft` schema
+before the server-side repair pass.
 - `ontology_agent/skills/`: extendable skill folders using Agno-style `SKILL.md` files.
 - `ontology_agent/cli.py`: command-line runner.
 

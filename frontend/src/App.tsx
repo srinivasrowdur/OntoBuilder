@@ -29,6 +29,7 @@ import type {
   DraftReviewSession,
   DraftStreamEvent,
   Entity,
+  GenerationCounts,
   GenerationStep,
   OntologyDraft,
   ProjectSummary,
@@ -55,6 +56,8 @@ export function App() {
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
   const [generationSteps, setGenerationSteps] = useState<GenerationStep[] | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState(0);
+  const [generationEntities, setGenerationEntities] = useState<string[]>([]);
+  const [generationCounts, setGenerationCounts] = useState<GenerationCounts | null>(null);
 
   const baseDraft = useMemo(() => draftForDisplay(session), [session]);
   const draft = useMemo(
@@ -134,9 +137,24 @@ export function App() {
     setProjectMessage(null);
     setGenerationSteps([]);
     setGenerationStartedAt(Date.now());
+    setGenerationEntities([]);
+    setGenerationCounts(null);
     try {
       const nextSession = await streamDraft(requestText, (event) => {
         setGenerationSteps((current) => applyStreamEvent(current ?? [], event));
+        if (event.type === "entity" && event.label) {
+          const label = event.label;
+          setGenerationEntities((current) =>
+            current.includes(label) ? current : [...current, label],
+          );
+        }
+        if (event.type === "counts") {
+          setGenerationCounts({
+            entities: event.entities ?? 0,
+            relationships: event.relationships ?? 0,
+            rules: event.rules ?? 0,
+          });
+        }
       }).catch(async (streamError) => {
         // Older backends have no stream route; fall back to the blocking endpoint.
         if (streamError instanceof Error && streamError.message.startsWith("API 404")) {
@@ -159,6 +177,8 @@ export function App() {
     } finally {
       setLoading(false);
       setGenerationSteps(null);
+      setGenerationEntities([]);
+      setGenerationCounts(null);
     }
   }
 
@@ -445,6 +465,8 @@ export function App() {
         canCommit={acceptedCount > 0}
         draft={draft}
         error={error}
+        generationCounts={generationCounts}
+        generationEntities={generationEntities}
         generationStartedAt={generationStartedAt}
         generationSteps={generationSteps}
         loading={loading}

@@ -24,6 +24,7 @@ import {
 import type {
   DraftReviewSession,
   Entity,
+  GenerationCounts,
   GenerationStep,
   NaturalLanguageStatement,
   OntologyDraft,
@@ -39,6 +40,8 @@ interface OntologyCanvasProps {
   canCommit: boolean;
   draft: OntologyDraft | null;
   error: string | null;
+  generationCounts: GenerationCounts | null;
+  generationEntities: string[];
   generationStartedAt: number;
   generationSteps: GenerationStep[] | null;
   loading: boolean;
@@ -83,6 +86,8 @@ export function OntologyCanvas({
   canCommit,
   draft,
   error,
+  generationCounts,
+  generationEntities,
   generationStartedAt,
   generationSteps,
   loading,
@@ -155,7 +160,12 @@ export function OntologyCanvas({
 
   const generationProgress =
     generationSteps && generationSteps.length > 0 ? (
-      <GenerationProgress startedAt={generationStartedAt} steps={generationSteps} />
+      <GenerationProgress
+        counts={generationCounts}
+        entities={generationEntities}
+        startedAt={generationStartedAt}
+        steps={generationSteps}
+      />
     ) : null;
 
   if (!draft) {

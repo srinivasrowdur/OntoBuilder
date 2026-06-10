@@ -104,13 +104,23 @@ export interface DraftReviewSession {
 }
 
 export interface DraftStreamEvent {
-  type: "stage" | "skill" | "heartbeat" | "complete" | "error";
+  type: "stage" | "skill" | "entity" | "counts" | "heartbeat" | "complete" | "error";
   stage?: string;
   message?: string;
   skill?: string;
   label?: string;
+  entity_type?: string | null;
+  entities?: number;
+  relationships?: number;
+  rules?: number;
   elapsed?: number;
   session?: DraftReviewSession;
+}
+
+export interface GenerationCounts {
+  entities: number;
+  relationships: number;
+  rules: number;
 }
 
 export interface GenerationStep {

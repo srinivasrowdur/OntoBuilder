@@ -41,3 +41,22 @@ def test_load_config_rejects_unsupported_provider(monkeypatch):
 
     with pytest.raises(ValueError, match="Unsupported ONTOLOGY_AGENT_PROVIDER"):
         load_config()
+
+
+def test_load_config_parser_model_default_and_override(monkeypatch):
+    monkeypatch.setenv("ONTOLOGY_AGENT_PROVIDER", "openai")
+    monkeypatch.setenv("ONTOLOGY_AGENT_MODEL", "")
+    monkeypatch.delenv("ONTOLOGY_AGENT_PARSER_MODEL", raising=False)
+
+    assert load_config().parser_model == "openai:gpt-5.4-mini"
+
+    monkeypatch.setenv("ONTOLOGY_AGENT_PARSER_MODEL", "openai:gpt-custom")
+    assert load_config().parser_model == "openai:gpt-custom"
+
+
+def test_load_config_parser_model_none_disables(monkeypatch):
+    monkeypatch.setenv("ONTOLOGY_AGENT_PROVIDER", "openai")
+    monkeypatch.setenv("ONTOLOGY_AGENT_MODEL", "")
+    monkeypatch.setenv("ONTOLOGY_AGENT_PARSER_MODEL", "none")
+
+    assert load_config().parser_model == ""

@@ -1930,3 +1930,43 @@ select {
 .generation-progress-step.active svg {
   color: var(--blue);
 }
+
+.generation-progress-counts {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.generation-progress-entities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.generation-progress-entity {
+  padding: 3px 10px;
+  background: var(--blue-bg);
+  color: var(--blue-text);
+  border: 1px solid rgba(106, 165, 255, 0.35);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  animation: entity-pop 240ms ease-out;
+}
+
+@keyframes entity-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .generation-progress-entity {
+    animation: none;
+  }
+}

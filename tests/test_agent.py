@@ -53,3 +53,26 @@ def test_default_mode_keeps_validation_tools_and_history(config: AgentConfig) ->
     assert agent.add_history_to_context is True
     assert agent.enable_session_summaries is True
     assert agent.tool_call_limit == 20
+
+
+def test_live_stream_mode_sets_parser_model_and_outline_grammar(config: AgentConfig) -> None:
+    import dataclasses
+
+    streaming_config = dataclasses.replace(config, parser_model="openai:gpt-5.4-mini")
+    agent = build_ontology_agent(streaming_config, draft_mode=True, live_stream=True)
+    assert agent.parser_model is not None
+    assert any("ENTITY:" in instruction for instruction in agent.instructions)
+
+
+def test_live_stream_without_parser_model_falls_back(config: AgentConfig) -> None:
+    import dataclasses
+
+    no_parser_config = dataclasses.replace(config, parser_model="")
+    agent = build_ontology_agent(no_parser_config, draft_mode=True, live_stream=True)
+    assert agent.parser_model is None
+    assert not any("ENTITY:" in instruction for instruction in agent.instructions)
+
+
+def test_draft_mode_alone_has_no_parser_model(config: AgentConfig) -> None:
+    agent = build_ontology_agent(config, draft_mode=True)
+    assert agent.parser_model is None

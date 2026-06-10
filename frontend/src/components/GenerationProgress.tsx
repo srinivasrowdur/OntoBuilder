@@ -1,13 +1,20 @@
 import { Check, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { GenerationStep } from "../types";
+import type { GenerationCounts, GenerationStep } from "../types";
 
 interface GenerationProgressProps {
+  counts: GenerationCounts | null;
+  entities: string[];
   steps: GenerationStep[];
   startedAt: number;
 }
 
-export function GenerationProgress({ steps, startedAt }: GenerationProgressProps) {
+export function GenerationProgress({
+  counts,
+  entities,
+  steps,
+  startedAt,
+}: GenerationProgressProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -35,6 +42,20 @@ export function GenerationProgress({ steps, startedAt }: GenerationProgressProps
           </li>
         ))}
       </ol>
+      {counts ? (
+        <div className="generation-progress-counts">
+          {counts.entities} entities · {counts.relationships} relationships · {counts.rules} rules
+        </div>
+      ) : null}
+      {entities.length > 0 ? (
+        <div aria-label="Drafted entities" className="generation-progress-entities">
+          {entities.map((label) => (
+            <span className="generation-progress-entity" key={label}>
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

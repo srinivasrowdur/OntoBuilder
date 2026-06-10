@@ -13,6 +13,10 @@ DEFAULT_MODELS = {
     "google": "google:gemini-2.5-flash",
     "openai": "openai:gpt-5.2",
 }
+DEFAULT_PARSER_MODELS = {
+    "google": "google:gemini-2.5-flash",
+    "openai": "openai:gpt-5.4-mini",
+}
 MODEL_ENV_BY_PROVIDER = {
     "google": "ONTOLOGY_AGENT_GOOGLE_MODEL",
     "openai": "ONTOLOGY_AGENT_OPENAI_MODEL",
@@ -29,6 +33,7 @@ class AgentConfig:
     skills_dir: Path = ROOT / "ontology_agent" / "skills"
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODELS[DEFAULT_PROVIDER]
+    parser_model: str = DEFAULT_PARSER_MODELS[DEFAULT_PROVIDER]
     vector_db: str = "none"
     user_id: str = "local-user"
     session_id: str = "ontology-builder"
@@ -57,6 +62,7 @@ def load_config() -> AgentConfig:
         projects_path=projects_path,
         provider=provider,
         model=_resolve_model(provider),
+        parser_model=_resolve_parser_model(provider),
         vector_db=os.getenv("ONTOLOGY_AGENT_VECTOR_DB", "none").lower(),
         user_id=os.getenv("ONTOLOGY_AGENT_USER_ID", "local-user"),
         session_id=os.getenv("ONTOLOGY_AGENT_SESSION_ID", "ontology-builder"),
@@ -82,3 +88,11 @@ def _resolve_model(provider: str) -> str:
 
     provider_model = os.getenv(MODEL_ENV_BY_PROVIDER[provider], "").strip()
     return provider_model or DEFAULT_MODELS[provider]
+
+
+def _resolve_parser_model(provider: str) -> str:
+    """Resolve the cheap model that structures streamed drafts. "none" disables it."""
+    explicit_model = os.getenv("ONTOLOGY_AGENT_PARSER_MODEL", "").strip()
+    if explicit_model.lower() == "none":
+        return ""
+    return explicit_model or DEFAULT_PARSER_MODELS[provider]

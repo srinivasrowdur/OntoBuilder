@@ -104,3 +104,51 @@ def test_stream_endpoint_reports_stream_errors(tmp_path) -> None:
     events = _parse_sse(response.text)
     assert events[-1]["type"] == "error"
     assert "provider exploded" in events[-1]["message"]
+
+
+def test_outline_parser_emits_entities_across_chunk_boundaries() -> None:
+    from ontology_agent.streaming import OutlineStreamParser
+
+    parser = OutlineStreamParser()
+    first = parser.feed("ENTITY: Pet | class | A companion animal.\nENTITY: Ow")
+    second = parser.feed("ner | role | A person who keeps a pet.\n")
+
+    assert [event["label"] for event in first] == ["Pet"]
+    assert first[0]["entity_type"] == "class"
+    assert [event["label"] for event in second] == ["Owner"]
+
+
+def test_outline_parser_dedupes_and_ignores_prose() -> None:
+    from ontology_agent.streaming import OutlineStreamParser
+
+    parser = OutlineStreamParser()
+    events = parser.feed(
+        "Here is the draft outline.\n"
+        "ENTITY: Pet | class | A companion animal.\n"
+        "ENTITY: Pet | class | Duplicate line.\n"
+        "DOMAIN: pets\n"
+    )
+    assert len(events) == 1
+    assert events[0]["label"] == "Pet"
+
+
+def test_outline_parser_counts_relationships_and_rules() -> None:
+    from ontology_agent.streaming import OutlineStreamParser
+
+    parser = OutlineStreamParser()
+    parser.feed("ENTITY: Pet | class | x\nENTITY: Owner | role | y\n")
+    events = parser.feed(
+        "RELATIONSHIP: Pet | belongs to | Owner | one or more\n"
+        "RULE: Pet | error | A Pet must have a species.\n"
+    )
+    assert events[0] == {"type": "counts", "entities": 2, "relationships": 1, "rules": 0}
+    assert events[1] == {"type": "counts", "entities": 2, "relationships": 1, "rules": 1}
+
+
+def test_outline_parser_flush_handles_trailing_line() -> None:
+    from ontology_agent.streaming import OutlineStreamParser
+
+    parser = OutlineStreamParser()
+    assert parser.feed("ENTITY: Pet | class | A companion animal.") == []
+    flushed = parser.flush()
+    assert [event["label"] for event in flushed] == ["Pet"]

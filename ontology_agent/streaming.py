@@ -34,6 +34,65 @@ def skill_label(skill_name: str) -> str:
     return skill_name.replace("-", " ").replace("_", " ").strip().capitalize() or skill_name
 
 
+class OutlineStreamParser:
+    """Incrementally extract draft items from streamed outline text.
+
+    The live-stream agent writes one item per line (ENTITY: / RELATIONSHIP: /
+    RULE: ...). Each completed line becomes a progress event the moment it
+    arrives; lines that do not match the grammar are ignored, so a model that
+    drifts into prose degrades gracefully instead of failing.
+    """
+
+    def __init__(self) -> None:
+        self._buffer = ""
+        self._seen_entities: set[str] = set()
+        self.relationship_count = 0
+        self.rule_count = 0
+
+    def feed(self, delta: str) -> list[dict[str, Any]]:
+        self._buffer += delta
+        events: list[dict[str, Any]] = []
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            event = self._parse_line(line.strip())
+            if event is not None:
+                events.append(event)
+        return events
+
+    def flush(self) -> list[dict[str, Any]]:
+        line, self._buffer = self._buffer.strip(), ""
+        event = self._parse_line(line)
+        return [event] if event is not None else []
+
+    def _parse_line(self, line: str) -> dict[str, Any] | None:
+        if line.startswith("ENTITY:"):
+            parts = [part.strip() for part in line[len("ENTITY:") :].split("|")]
+            label = parts[0] if parts else ""
+            if not label or label.lower() in self._seen_entities:
+                return None
+            self._seen_entities.add(label.lower())
+            return {
+                "type": "entity",
+                "label": label,
+                "entity_type": parts[1] if len(parts) > 1 and parts[1] else None,
+            }
+        if line.startswith("RELATIONSHIP:"):
+            self.relationship_count += 1
+            return self._counts_event()
+        if line.startswith("RULE:"):
+            self.rule_count += 1
+            return self._counts_event()
+        return None
+
+    def _counts_event(self) -> dict[str, Any]:
+        return {
+            "type": "counts",
+            "entities": len(self._seen_entities),
+            "relationships": self.relationship_count,
+            "rules": self.rule_count,
+        }
+
+
 def map_agno_event(event: Any, state: dict[str, Any]) -> dict[str, Any] | None:
     """Map one Agno run event to a draft-stream progress event, updating state."""
     name = getattr(event, "event", "")
@@ -116,7 +175,7 @@ def stream_draft_events(
 
     def run_agent() -> None:
         try:
-            agent = build_ontology_agent(config, draft_mode=True)
+            agent = build_ontology_agent(config, draft_mode=True, live_stream=True)
             for agno_event in agent.run(
                 input=request,
                 stream=True,
@@ -134,6 +193,7 @@ def stream_draft_events(
 
     started = time.monotonic()
     state: dict[str, Any] = {}
+    outline = OutlineStreamParser()
     while True:
         try:
             kind, payload = events.get(timeout=HEARTBEAT_SECONDS)
@@ -144,7 +204,20 @@ def stream_draft_events(
             yield {"type": "error", "message": str(payload)}
             return
         if kind == "done":
+            yield from outline.flush()
             break
+
+        event_name = getattr(payload, "event", "")
+        if event_name == "RunContent":
+            content = getattr(payload, "content", None)
+            if isinstance(content, str) and content:
+                state["text"] = state.get("text", "") + content
+                yield from outline.feed(content)
+                continue
+        if event_name == "ParserModelResponseStarted":
+            yield {"type": "stage", "stage": "structuring", "message": "Structuring the draft"}
+            continue
+
         mapped = map_agno_event(payload, state)
         if mapped is not None:
             yield mapped
@@ -152,13 +225,14 @@ def stream_draft_events(
     if state.get("error"):
         yield {"type": "error", "message": str(state["error"])}
         return
-    if "content" not in state:
+    final_content = state.get("content") or state.get("text")
+    if not final_content:
         yield {"type": "error", "message": "The agent returned no draft content."}
         return
 
     yield {"type": "stage", "stage": "validating", "message": "Validating and repairing the draft"}
     try:
-        draft = response_to_draft(state["content"])
+        draft = response_to_draft(final_content)
     except Exception as exc:
         yield {"type": "error", "message": f"Draft validation failed: {exc}"}
         return
