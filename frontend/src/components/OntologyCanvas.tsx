@@ -15,7 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import {
-  getReadiness,
+  getReadinessReport,
   relationshipById,
   ruleById,
   ruleValuePhrase,
@@ -44,6 +44,7 @@ interface OntologyCanvasProps {
   generationEntities: string[];
   generationStartedAt: number;
   generationSteps: GenerationStep[] | null;
+  hasCommitted: boolean;
   loading: boolean;
   prompt: string;
   projectMessage: string | null;
@@ -58,6 +59,7 @@ interface OntologyCanvasProps {
   onCreateStatement: (payload: StatementCreatePayload) => Promise<void>;
   onDownload: () => void;
   onGenerate: () => void;
+  onGenerateExample: (text: string) => void;
   onLoadSample: () => void;
   onPromptChange: (prompt: string) => void;
   onProjectCreate: (name: string, description?: string) => Promise<void>;
@@ -77,6 +79,25 @@ interface TextRange {
 
 type CanvasView = "statements" | "graph";
 
+const EXAMPLE_PROMPTS = [
+  {
+    title: "Pension schemes",
+    prompt: "Build an ontology for workplace pension schemes",
+  },
+  {
+    title: "Insurance claims",
+    prompt: "Build an ontology for insurance claims handling",
+  },
+  {
+    title: "Clinical referrals",
+    prompt: "Build an ontology for hospital referrals focused on prior authorization",
+  },
+  {
+    title: "Music festivals",
+    prompt: "Build an ontology for organising music festivals",
+  },
+];
+
 type StatementPart =
   | { kind: "text"; value: string }
   | { kind: "constraint"; value: string }
@@ -90,12 +111,14 @@ export function OntologyCanvas({
   generationEntities,
   generationStartedAt,
   generationSteps,
+  hasCommitted,
   loading,
   onCreateStatement,
   onAcceptAll,
   onCommit,
   onDownload,
   onGenerate,
+  onGenerateExample,
   onLoadSample,
   onPromptChange,
   onProjectCreate,
@@ -112,10 +135,11 @@ export function OntologyCanvas({
   selectedStatementId,
   onSelectStatement,
 }: OntologyCanvasProps) {
-  const { readiness, blockingIssues } = getReadiness(draft);
+  const readinessReport = getReadinessReport(session);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [canvasView, setCanvasView] = useState<CanvasView>("statements");
   const [isProjectDrawerOpen, setIsProjectDrawerOpen] = useState(false);
+  const [worklistOpen, setWorklistOpen] = useState(false);
   const workspaceScrollRef = useRef<HTMLDivElement | null>(null);
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -127,6 +151,8 @@ export function OntologyCanvas({
   );
   const pendingCount =
     session?.statements.filter((review) => review.status === "pending").length ?? 0;
+  const blockingStatuses = new Set(["pending", "needs_clarification"]);
+  const showWorklist = worklistOpen && readinessReport.blockingCount > 0;
 
   function handlePromptSubmit(event: FormEvent) {
     event.preventDefault();
@@ -169,12 +195,23 @@ export function OntologyCanvas({
     ) : null;
 
   if (!draft) {
+    const isGenerating = Boolean(generationProgress) || loading;
+    const recentProjects = projects.filter((project) => project.draft_id).slice(0, 3);
     return (
       <section className="ontology-panel empty-state">
         {projectDrawer}
         {projectMenuButton}
         <div className="empty-canvas-center">
           {selectedProject ? <h1 className="empty-project-name">{selectedProject.name}</h1> : null}
+          {!selectedProject && !isGenerating ? (
+            <div className="first-run-intro">
+              <h1>What should we model?</h1>
+              <p>
+                Describe a domain and OntoBuilder drafts an ontology you can review as plain
+                English, refine, and export as JSON.
+              </p>
+            </div>
+          ) : null}
           <OntologyPromptDock
             canCommit={false}
             canDownload={false}
@@ -193,6 +230,43 @@ export function OntologyCanvas({
             onSubmit={handlePromptSubmit}
           />
           {generationProgress}
+          {!isGenerating ? (
+            <div className="first-run-suggestions">
+              <div className="example-prompts" aria-label="Example ontologies">
+                {EXAMPLE_PROMPTS.map((example) => (
+                  <button
+                    key={example.title}
+                    onClick={() => onGenerateExample(example.prompt)}
+                    type="button"
+                  >
+                    <strong>{example.title}</strong>
+                    <span>{example.prompt}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="first-run-secondary">
+                <button className="first-run-sample" onClick={onLoadSample} type="button">
+                  <Upload size={14} />
+                  Load the retirements sample — no API key needed
+                </button>
+                {recentProjects.length > 0 ? (
+                  <div className="first-run-recents" aria-label="Recent projects">
+                    <span>Recent:</span>
+                    {recentProjects.map((project) => (
+                      <button
+                        key={project.id}
+                        onClick={() => void onProjectOpen(project.id)}
+                        type="button"
+                      >
+                        <Folder size={13} />
+                        {project.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     );
@@ -206,12 +280,42 @@ export function OntologyCanvas({
         className={`ontology-workspace-scroll${canvasView === "graph" ? " graph-mode" : ""}`}
         ref={workspaceScrollRef}
       >
-        <div className="status-line">
-          <span>
-            Export readiness <strong>{readiness}%</strong>
-          </span>
-          <span className="dot">·</span>
-          <span className="issue">{blockingIssues} blocking issues</span>
+        <div className="readiness-bar" aria-label="Review progress">
+          <div className="readiness-progress">
+            <span className="readiness-track" aria-hidden="true">
+              <span className="readiness-fill" style={{ width: `${readinessReport.readiness}%` }} />
+            </span>
+            <span className="readiness-summary">
+              <strong>{readinessReport.decidedCount}</strong> of{" "}
+              <strong>{readinessReport.totalCount}</strong> reviewed
+            </span>
+          </div>
+          <div className="readiness-stages" aria-label="Workflow stage">
+            {(["review", "resolve", "export"] as const).map((stage) => (
+              <span
+                className={`readiness-stage${readinessReport.stage === stage ? " active" : ""}`}
+                key={stage}
+              >
+                {stage === "review" ? "Review" : stage === "resolve" ? "Resolve" : "Export"}
+              </span>
+            ))}
+          </div>
+          {readinessReport.blockingCount > 0 ? (
+            <button
+              className={`readiness-worklist-toggle${showWorklist ? " active" : ""}`}
+              onClick={() => {
+                setCanvasView("statements");
+                setWorklistOpen((open) => !open);
+              }}
+              type="button"
+            >
+              {showWorklist
+                ? "Show all statements"
+                : `${readinessReport.blockingCount} need a decision`}
+            </button>
+          ) : (
+            <span className="readiness-ready">Ready to commit</span>
+          )}
         </div>
 
         <div className="domain-title">
@@ -263,38 +367,70 @@ export function OntologyCanvas({
                   />
                 ) : null}
 
-                {draft.statements.map((statement) => (
-                  <div
-                    className={[
-                      "statement-row",
-                      `statement-${statement.kind}`,
-                      selectedStatementId === statement.id ? "selected" : "",
-                      statementStatus(session, statement),
-                    ].join(" ")}
-                    key={statement.id}
-                    onClick={() => onSelectStatement(statement.id)}
-                  >
-                    <span className="statement-status" aria-hidden="true" />
-                    <span className="statement-body">
-                      <span className={`statement-kind ${statement.kind}`}>
-                        {statement.kind === "rule" ? "Rule" : "Relationship"}
-                      </span>
-                      <span className="statement">
-                        {renderStatementParts(statement, draft).map((part, index) =>
-                          renderStatementPart({
-                            entityLabels,
-                            index,
-                            onSelectEntity,
-                            onSelectStatement,
-                            part,
-                            selectedEntityId,
-                            statement,
-                          }),
-                        )}
-                      </span>
+                {showWorklist ? (
+                  <div className="worklist-banner" role="status">
+                    <strong>
+                      Worklist · {readinessReport.blockingCount} statement
+                      {readinessReport.blockingCount === 1 ? "" : "s"} need a decision
+                    </strong>
+                    <span>
+                      Accept, edit, or reject each one below. Rejected statements are left out of
+                      the committed ontology.
                     </span>
+                    {readinessReport.openQuestions.length > 0 ? (
+                      <ul className="worklist-questions">
+                        {readinessReport.openQuestions.map((question) => (
+                          <li key={question}>{question}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
-                ))}
+                ) : null}
+
+                {draft.statements
+                  .filter(
+                    (statement) =>
+                      !showWorklist || blockingStatuses.has(statementStatus(session, statement)),
+                  )
+                  .map((statement) => (
+                    <div
+                      className={[
+                        "statement-row",
+                        `statement-${statement.kind}`,
+                        selectedStatementId === statement.id ? "selected" : "",
+                        statementStatus(session, statement),
+                      ].join(" ")}
+                      key={statement.id}
+                      onClick={() => onSelectStatement(statement.id)}
+                    >
+                      <span className="statement-status" aria-hidden="true" />
+                      <span className="statement-body">
+                        <span className={`statement-kind ${statement.kind}`}>
+                          {statement.kind === "rule" ? "Rule" : "Relationship"}
+                        </span>
+                        <span className="statement">
+                          {renderStatementParts(statement, draft).map((part, index) =>
+                            renderStatementPart({
+                              entityLabels,
+                              index,
+                              onSelectEntity,
+                              onSelectStatement,
+                              part,
+                              selectedEntityId,
+                              statement,
+                            }),
+                          )}
+                        </span>
+                        {showWorklist ? (
+                          <span className="worklist-reason">
+                            {statementStatus(session, statement) === "needs_clarification"
+                              ? "marked for clarification"
+                              : "awaiting review"}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))}
               </div>
             ) : (
               <RelationshipGraph
@@ -320,6 +456,9 @@ export function OntologyCanvas({
       <OntologyPromptDock
         canCommit={canCommit}
         canDownload={Boolean(draft)}
+        commitEmphasis={readinessReport.stage === "export" && canCommit && !hasCommitted}
+        committableCount={readinessReport.committableCount}
+        downloadEmphasis={hasCommitted}
         error={error}
         entities={draft.entities}
         loading={loading}
@@ -487,6 +626,9 @@ function ProjectDrawer({
 function OntologyPromptDock({
   canCommit,
   canDownload,
+  commitEmphasis = false,
+  committableCount = 0,
+  downloadEmphasis = false,
   entities,
   error,
   loading,
@@ -503,6 +645,9 @@ function OntologyPromptDock({
 }: {
   canCommit: boolean;
   canDownload: boolean;
+  commitEmphasis?: boolean;
+  committableCount?: number;
+  downloadEmphasis?: boolean;
   entities: Entity[];
   error: string | null;
   loading: boolean;
@@ -587,17 +732,28 @@ function OntologyPromptDock({
             <Upload size={15} />
             Sample
           </button>
-          <button disabled={!canDownload} onClick={onDownload} type="button">
+          <button
+            className={downloadEmphasis ? "dock-primary" : ""}
+            disabled={!canDownload}
+            onClick={onDownload}
+            type="button"
+          >
             <Download size={15} />
-            JSON
+            {downloadEmphasis ? "Download JSON" : "JSON"}
           </button>
           <button disabled={pendingCount === 0} onClick={onAcceptAll} type="button">
             <Check size={15} />
             Accept {pendingCount}
           </button>
-          <button disabled={!canCommit} onClick={onCommit} type="button">
+          <button
+            className={commitEmphasis ? "dock-primary" : ""}
+            disabled={!canCommit}
+            onClick={onCommit}
+            title={canCommit ? undefined : "Accept or edit at least one statement first"}
+            type="button"
+          >
             <FileJson size={15} />
-            Commit
+            Commit{committableCount > 0 ? ` ${committableCount}` : ""}
           </button>
         </div>
       ) : null}

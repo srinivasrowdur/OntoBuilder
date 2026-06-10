@@ -127,8 +127,8 @@ export function App() {
     }
   }
 
-  async function generateDraft() {
-    const requestText = prompt.trim();
+  async function generateDraft(promptOverride?: string) {
+    const requestText = (promptOverride ?? prompt).trim();
     if (!requestText) {
       return;
     }
@@ -180,6 +180,11 @@ export function App() {
       setGenerationEntities([]);
       setGenerationCounts(null);
     }
+  }
+
+  function generateFromExample(text: string) {
+    setPrompt(text);
+    void generateDraft(text);
   }
 
   async function submitPrompt() {
@@ -463,6 +468,7 @@ export function App() {
     <main className="app-shell">
       <OntologyCanvas
         canCommit={acceptedCount > 0}
+        hasCommitted={Boolean(committed)}
         draft={draft}
         error={error}
         generationCounts={generationCounts}
@@ -472,6 +478,7 @@ export function App() {
         loading={loading}
         onAcceptAll={acceptAllPending}
         onCommit={commitAccepted}
+        onGenerateExample={generateFromExample}
         onCreateStatement={addStatement}
         onDownload={downloadJson}
         onGenerate={submitPrompt}

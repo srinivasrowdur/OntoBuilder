@@ -43,16 +43,56 @@ export function getReviewCounts(reviews: StatementReview[]) {
   );
 }
 
-export function getReadiness(draft: OntologyDraft | null) {
-  if (!draft) {
-    return { readiness: 0, blockingIssues: 0 };
+export type ReadinessStage = "draft" | "review" | "resolve" | "export";
+
+export interface ReadinessReport {
+  readiness: number;
+  totalCount: number;
+  decidedCount: number;
+  blockingCount: number;
+  pendingCount: number;
+  clarifyCount: number;
+  committableCount: number;
+  openQuestions: string[];
+  stage: ReadinessStage;
+}
+
+const EMPTY_READINESS: ReadinessReport = {
+  readiness: 0,
+  totalCount: 0,
+  decidedCount: 0,
+  blockingCount: 0,
+  pendingCount: 0,
+  clarifyCount: 0,
+  committableCount: 0,
+  openQuestions: [],
+  stage: "draft",
+};
+
+export function getReadinessReport(session: DraftReviewSession | null): ReadinessReport {
+  if (!session || session.statements.length === 0) {
+    return EMPTY_READINESS;
   }
-  const blockingIssues = Math.min(2, draft.open_questions.length);
-  const readiness = Math.max(
-    70,
-    98 - blockingIssues * 3 - Math.max(1, Math.floor(draft.assumptions.length / 2)),
-  );
-  return { readiness, blockingIssues };
+  const counts = getReviewCounts(session.statements);
+  const totalCount = session.statements.length;
+  const pendingCount = counts.pending;
+  const clarifyCount = counts.needs_clarification;
+  const blockingCount = pendingCount + clarifyCount;
+  const decidedCount = totalCount - blockingCount;
+  const committableCount = counts.accepted + counts.edited;
+  const stage: ReadinessStage =
+    pendingCount > 0 ? "review" : clarifyCount > 0 ? "resolve" : "export";
+  return {
+    readiness: Math.round((decidedCount / totalCount) * 100),
+    totalCount,
+    decidedCount,
+    blockingCount,
+    pendingCount,
+    clarifyCount,
+    committableCount,
+    openQuestions: session.draft.open_questions,
+    stage,
+  };
 }
 
 export function relationshipById(
