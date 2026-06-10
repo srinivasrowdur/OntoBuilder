@@ -1,34 +1,41 @@
-import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useFrame } from "@react-three/fiber";
 import type { ReactNode } from "react";
 import type {
   GraphCanvasRef,
-  GraphEdge,
-  GraphNode,
   InternalGraphEdge,
   InternalGraphNode,
-  InternalGraphPosition,
   LayoutOverrides,
   Theme,
 } from "reagraph";
-import type { Entity, NaturalLanguageStatement, OntologyDraft, Relationship } from "../types";
+import { buildGraphRenderKey, buildOntologyGraphData } from "../graphModel";
+import type { NaturalLanguageStatement, OntologyDraft } from "../types";
 
 interface RelationshipGraphProps {
   draft: OntologyDraft;
   onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
+  onShowTextView?: () => void;
   selectedEntityId: string | null;
   selectedStatementId: string | null;
 }
 
-interface OntologyGraphData {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  degreeByEntityId: Map<string, number>;
-  positionsByEntityId: Map<string, GraphPosition>;
-  relationshipById: Map<string, Relationship>;
+interface GraphViewportSize {
+  width: number;
+  height: number;
 }
 
-type GraphPosition = Pick<InternalGraphPosition, "x" | "y" | "z">;
+const MIN_GRAPH_VIEWPORT_SIZE = 24;
+const MAX_GRAPH_READY_FRAMES = 90;
 
 const ReagraphCanvas = lazy(async () => {
   const module = await import("reagraph");
@@ -109,12 +116,18 @@ export function RelationshipGraph({
   draft,
   onSelectEntity,
   onSelectStatement,
+  onShowTextView,
   selectedEntityId,
   selectedStatementId,
 }: RelationshipGraphProps) {
   const graphRef = useRef<GraphCanvasRef | null>(null);
-  const graphMapRef = useRef<HTMLDivElement | null>(null);
-  const fitFrameIds = useRef<number[]>([]);
+  const fittedGraphKeyRef = useRef<string | null>(null);
+  const [graphMapElement, setGraphMapElement] = useState<HTMLDivElement | null>(null);
+  const [graphViewportSize, setGraphViewportSize] = useState<GraphViewportSize | null>(null);
+  const [readyFrameAttempt, setReadyFrameAttempt] = useState(0);
+  const [fitCompleteKey, setFitCompleteKey] = useState<string | null>(null);
+  const [graphAttempt, setGraphAttempt] = useState(0);
+  const [graphFitError, setGraphFitError] = useState<Error | null>(null);
   const statementByRelationshipId = useMemo(() => {
     const statements = new Map<string, NaturalLanguageStatement>();
     for (const statement of draft.statements) {
@@ -140,35 +153,41 @@ export function RelationshipGraph({
     return statements;
   }, [draft.statements]);
   const graph = useMemo(() => buildOntologyGraphData(draft), [draft]);
-  const graphRenderKey = useMemo(
-    () =>
-      [
-        graph.nodes.map((node) => node.id).join("|"),
-        graph.edges.map((edge) => edge.id).join("|"),
-      ].join("::"),
-    [graph.edges, graph.nodes],
-  );
-  const fitGraphToView = useCallback(() => {
-    if (graph.nodes.length === 0) {
-      return;
-    }
-    graphRef.current?.fitNodesInView(undefined, { animated: false });
-  }, [graph.nodes.length]);
-  const clearFitFrames = useCallback(() => {
-    fitFrameIds.current.forEach(window.cancelAnimationFrame);
-    fitFrameIds.current = [];
+  const graphRenderKey = useMemo(() => buildGraphRenderKey(graph), [graph]);
+  const graphCanvasKey = `${graphRenderKey}:${graphAttempt}`;
+  const graphFitKey = `${graphCanvasKey}:${graphViewportSize?.width ?? 0}x${
+    graphViewportSize?.height ?? 0
+  }`;
+  const graphFitComplete = fitCompleteKey === graphFitKey;
+  const graphViewportReady = isGraphViewportReady(graphViewportSize);
+  const setGraphCanvasRef = useCallback((canvas: GraphCanvasRef | null) => {
+    graphRef.current = canvas;
   }, []);
-  const scheduleFitGraphToView = useCallback(() => {
-    clearFitFrames();
-    if (graph.nodes.length === 0) {
-      return;
-    }
-    const firstFrameId = window.requestAnimationFrame(() => {
-      const secondFrameId = window.requestAnimationFrame(fitGraphToView);
-      fitFrameIds.current.push(secondFrameId);
+  const markGraphReady = useCallback(() => {
+    setReadyFrameAttempt((attempt) => attempt + 1);
+  }, []);
+  const retryGraph = useCallback(() => {
+    graphRef.current = null;
+    fittedGraphKeyRef.current = null;
+    setFitCompleteKey(null);
+    setGraphFitError(null);
+    setReadyFrameAttempt(0);
+    setGraphAttempt((attempt) => attempt + 1);
+  }, []);
+  const updateGraphViewportSize = useCallback((element: HTMLDivElement) => {
+    const { height, width } = element.getBoundingClientRect();
+    const nextSize = {
+      height: Math.round(height),
+      width: Math.round(width),
+    };
+
+    setGraphViewportSize((currentSize) => {
+      if (currentSize?.height === nextSize.height && currentSize.width === nextSize.width) {
+        return currentSize;
+      }
+      return nextSize;
     });
-    fitFrameIds.current.push(firstFrameId);
-  }, [clearFitFrames, fitGraphToView, graph.nodes.length]);
+  }, []);
   const layoutOverrides = useMemo(
     () =>
       ({
@@ -204,23 +223,71 @@ export function RelationshipGraph({
   }, [selectedEntityId, selectedRelationship, selectedStatement]);
 
   useEffect(() => {
-    scheduleFitGraphToView();
-    return clearFitFrames;
-  }, [clearFitFrames, graphRenderKey, scheduleFitGraphToView]);
+    fittedGraphKeyRef.current = null;
+    setReadyFrameAttempt(0);
+    setFitCompleteKey(null);
+    setGraphFitError(null);
+  }, [graphCanvasKey]);
 
   useEffect(() => {
-    const graphMap = graphMapRef.current;
-    if (!graphMap || typeof ResizeObserver === "undefined") {
+    if (!graphMapElement) {
       return;
     }
 
-    const observer = new ResizeObserver(scheduleFitGraphToView);
-    observer.observe(graphMap);
+    updateGraphViewportSize(graphMapElement);
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateGraphViewportSize(graphMapElement));
+    observer.observe(graphMapElement);
 
     return () => {
       observer.disconnect();
     };
-  }, [scheduleFitGraphToView]);
+  }, [graphMapElement, updateGraphViewportSize]);
+
+  useEffect(() => {
+    if (
+      !graphViewportReady ||
+      readyFrameAttempt === 0 ||
+      graph.nodes.length === 0 ||
+      graphFitError ||
+      graphFitComplete
+    ) {
+      return;
+    }
+
+    const graphApi = graphRef.current;
+    const renderedGraph = graphApi?.getGraph() as unknown;
+    if (!graphApi || !renderedGraph) {
+      if (readyFrameAttempt >= MAX_GRAPH_READY_FRAMES) {
+        setGraphFitError(new Error("Graph renderer did not become ready."));
+      }
+      return;
+    }
+
+    if (fittedGraphKeyRef.current === graphFitKey) {
+      return;
+    }
+
+    try {
+      graphApi.fitNodesInView(undefined, { animated: false });
+      fittedGraphKeyRef.current = graphFitKey;
+      setFitCompleteKey(graphFitKey);
+    } catch (error) {
+      setGraphFitError(toError(error));
+    }
+  }, [
+    graph.nodes.length,
+    graphCanvasKey,
+    graphFitComplete,
+    graphFitError,
+    graphFitKey,
+    graphViewportReady,
+    readyFrameAttempt,
+  ]);
 
   if (graph.nodes.length === 0) {
     return (
@@ -237,199 +304,68 @@ export function RelationshipGraph({
         <span>{graph.edges.length} edges</span>
       </div>
 
-      <div className="graph-map reagraph-map" ref={graphMapRef}>
-        <GraphErrorBoundary resetKey={graphRenderKey}>
-          <Suspense
-            fallback={
-              <div className="graph-loading" role="status" aria-label="Loading graph">
-                <span aria-hidden="true" />
-              </div>
-            }
+      <div className="graph-map reagraph-map" ref={setGraphMapElement}>
+        {graphFitError ? (
+          <GraphFailurePanel
+            message="The graph canvas mounted, but fitting the ontology view failed."
+            onRetry={retryGraph}
+            onShowTextView={onShowTextView}
+          />
+        ) : (
+          <GraphErrorBoundary
+            onRetry={retryGraph}
+            onShowTextView={onShowTextView}
+            resetKey={graphCanvasKey}
           >
-            <ReagraphCanvas
-              actives={selectedIds}
-              aggregateEdges={false}
-              animated
-              cameraMode="pan"
-              defaultNodeSize={10}
-              draggable
-              edgeArrowPosition="end"
-              edgeInterpolation="curved"
-              edgeLabelPosition="natural"
-              edges={graph.edges}
-              key={graphRenderKey}
-              labelType="all"
-              layoutOverrides={layoutOverrides}
-              layoutType="custom"
-              maxNodeSize={18}
-              minNodeSize={7}
-              nodes={graph.nodes}
-              onEdgeClick={(edge) =>
-                selectStatementForEdge(edge, statementByRelationshipId, onSelectStatement)
+            <Suspense
+              fallback={
+                <div className="graph-loading" role="status" aria-label="Loading graph">
+                  <span aria-hidden="true" />
+                </div>
               }
-              onNodeClick={(node) =>
-                selectStatementForNode(node, statementByEntityId, onSelectStatement, onSelectEntity)
-              }
-              ref={graphRef}
-              selections={selectedIds}
-              sizingType="default"
-              theme={ONTOLOGY_GRAPH_THEME}
-            />
-          </Suspense>
-        </GraphErrorBoundary>
+            >
+              <ReagraphCanvas
+                actives={selectedIds}
+                aggregateEdges={false}
+                animated
+                cameraMode="pan"
+                defaultNodeSize={10}
+                draggable
+                edgeArrowPosition="end"
+                edgeInterpolation="curved"
+                edgeLabelPosition="natural"
+                edges={graph.edges}
+                key={graphCanvasKey}
+                labelType="all"
+                layoutOverrides={layoutOverrides}
+                layoutType="custom"
+                maxNodeSize={18}
+                minNodeSize={7}
+                nodes={graph.nodes}
+                onEdgeClick={(edge) =>
+                  selectStatementForEdge(edge, statementByRelationshipId, onSelectStatement)
+                }
+                onNodeClick={(node) =>
+                  selectStatementForNode(
+                    node,
+                    statementByEntityId,
+                    onSelectStatement,
+                    onSelectEntity,
+                  )
+                }
+                ref={setGraphCanvasRef}
+                selections={selectedIds}
+                sizingType="default"
+                theme={ONTOLOGY_GRAPH_THEME}
+              >
+                <GraphCanvasReadySignal active={!graphFitComplete} onReady={markGraphReady} />
+              </ReagraphCanvas>
+            </Suspense>
+          </GraphErrorBoundary>
+        )}
       </div>
     </section>
   );
-}
-
-function buildOntologyGraphData(draft: OntologyDraft): OntologyGraphData {
-  const entityById = new Map(draft.entities.map((entity) => [entity.id, entity]));
-  const degreeByEntityId = new Map(draft.entities.map((entity) => [entity.id, 0]));
-  const relationshipById = new Map(
-    draft.relationships.map((relationship) => [relationship.id, relationship]),
-  );
-
-  for (const relationship of draft.relationships) {
-    ensureGraphEntity(entityById, degreeByEntityId, relationship.subject_entity_id);
-    ensureGraphEntity(entityById, degreeByEntityId, relationship.object_entity_id);
-    degreeByEntityId.set(
-      relationship.subject_entity_id,
-      (degreeByEntityId.get(relationship.subject_entity_id) ?? 0) + 1,
-    );
-    degreeByEntityId.set(
-      relationship.object_entity_id,
-      (degreeByEntityId.get(relationship.object_entity_id) ?? 0) + 1,
-    );
-  }
-
-  const positionsByEntityId = buildGraphPositions([...entityById.values()], degreeByEntityId);
-  const nodes: GraphNode[] = [...entityById.values()]
-    .sort((left, right) => left.label.localeCompare(right.label))
-    .map((entity) => {
-      const degree = degreeByEntityId.get(entity.id) ?? 0;
-      const position = positionsByEntityId.get(entity.id) ?? { x: 0, y: 0, z: 0 };
-      return {
-        cluster: entity.entity_type,
-        data: {
-          degree,
-          description: entity.description,
-          entityType: entity.entity_type,
-        },
-        fill: entityFill(entity.entity_type),
-        fx: position.x,
-        fy: position.y,
-        fz: position.z,
-        id: entity.id,
-        label: entity.label,
-        labelVisible: true,
-        size: 8 + Math.min(10, degree * 1.4),
-        subLabel: entity.entity_type,
-      };
-    });
-
-  const edges: GraphEdge[] = [...draft.relationships]
-    .sort((left, right) => left.label.localeCompare(right.label))
-    .map((relationship) => ({
-      arrowPlacement: "end",
-      data: {
-        cardinality: relationship.cardinality?.text ?? null,
-        relationshipType: relationship.relationship_type,
-      },
-      fill: "#94a9d8",
-      id: relationship.id,
-      interpolation: "curved",
-      label: relationship.label,
-      labelVisible: true,
-      size: 2,
-      source: relationship.subject_entity_id,
-      subLabel: relationshipMeta(relationship),
-      target: relationship.object_entity_id,
-    }));
-
-  return { degreeByEntityId, edges, nodes, positionsByEntityId, relationshipById };
-}
-
-function buildGraphPositions(entities: Entity[], degreeByEntityId: Map<string, number>) {
-  const positionsByEntityId = new Map<string, GraphPosition>();
-  const sortedEntities = [...entities].sort((left, right) => {
-    const degreeDelta =
-      (degreeByEntityId.get(right.id) ?? 0) - (degreeByEntityId.get(left.id) ?? 0);
-    return degreeDelta || left.label.localeCompare(right.label);
-  });
-
-  if (sortedEntities.length === 0) {
-    return positionsByEntityId;
-  }
-
-  const [centerEntity, ...outerEntities] = sortedEntities;
-  positionsByEntityId.set(centerEntity.id, { x: 0, y: 0, z: 0 });
-
-  outerEntities.forEach((entity, index) => {
-    const ring = Math.floor(index / 8);
-    const ringStart = ring * 8;
-    const ringIndex = index - ringStart;
-    const ringSize = Math.min(8 + ring * 4, outerEntities.length - ringStart);
-    const radius = 175 + ring * 145;
-    const angle = -Math.PI / 2 + (ringIndex / Math.max(1, ringSize)) * Math.PI * 2;
-    positionsByEntityId.set(entity.id, {
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius,
-      z: 0,
-    });
-  });
-
-  return positionsByEntityId;
-}
-
-function ensureGraphEntity(
-  entityById: Map<string, Entity>,
-  degreeByEntityId: Map<string, number>,
-  entityId: string,
-) {
-  if (entityById.has(entityId)) {
-    return;
-  }
-  entityById.set(entityId, {
-    aliases: [],
-    confidence: 0,
-    description: "",
-    entity_type: "entity",
-    examples: [],
-    id: entityId,
-    label: entityId,
-  });
-  degreeByEntityId.set(entityId, 0);
-}
-
-function relationshipMeta(relationship: Relationship) {
-  return [
-    relationship.relationship_type,
-    relationship.cardinality?.text ? relationship.cardinality.text : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function entityFill(entityType: string) {
-  switch (entityType) {
-    case "role":
-      return "#2b6f7b";
-    case "document":
-      return "#5d5fa8";
-    case "event":
-      return "#6f5b2b";
-    case "process":
-      return "#356c51";
-    case "state":
-      return "#704965";
-    case "attribute":
-    case "value":
-      return "#6c5d31";
-    case "external_reference":
-      return "#526070";
-    default:
-      return "#24486f";
-  }
 }
 
 function selectStatementForEdge(
@@ -456,8 +392,60 @@ function selectStatementForNode(
   onSelectEntity(node.id);
 }
 
+function isGraphViewportReady(size: GraphViewportSize | null) {
+  return Boolean(
+    size && size.width >= MIN_GRAPH_VIEWPORT_SIZE && size.height >= MIN_GRAPH_VIEWPORT_SIZE,
+  );
+}
+
+function GraphCanvasReadySignal({ active, onReady }: { active: boolean; onReady: () => void }) {
+  useFrame(() => {
+    if (active) {
+      onReady();
+    }
+  });
+
+  return null;
+}
+
+function GraphFailurePanel({
+  message,
+  onRetry,
+  onShowTextView,
+}: {
+  message: string;
+  onRetry: () => void;
+  onShowTextView?: () => void;
+}) {
+  return (
+    <div className="graph-error" role="alert">
+      <strong>Graph view failed to load</strong>
+      <span>{message}</span>
+      <div className="graph-error-actions">
+        <button type="button" onClick={onRetry}>
+          Retry
+        </button>
+        {onShowTextView ? (
+          <button type="button" onClick={onShowTextView}>
+            Text view
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function toError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 class GraphErrorBoundary extends Component<
-  { children: ReactNode; resetKey: string },
+  {
+    children: ReactNode;
+    onRetry: () => void;
+    onShowTextView?: () => void;
+    resetKey: string;
+  },
   { error: Error | null }
 > {
   state = { error: null };
@@ -475,10 +463,11 @@ class GraphErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <div className="graph-error" role="alert">
-          <strong>Graph view failed to load</strong>
-          <span>Use the Text view while the graph renderer recovers.</span>
-        </div>
+        <GraphFailurePanel
+          message="The graph renderer could not start for this ontology."
+          onRetry={this.props.onRetry}
+          onShowTextView={this.props.onShowTextView}
+        />
       );
     }
 
