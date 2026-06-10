@@ -17,7 +17,8 @@ import type {
   LayoutOverrides,
   Theme,
 } from "reagraph";
-import { buildGraphRenderKey, buildOntologyGraphData } from "../graphModel";
+import { Maximize2 } from "lucide-react";
+import { buildGraphLegend, buildGraphRenderKey, buildOntologyGraphData } from "../graphModel";
 import type { NaturalLanguageStatement, OntologyDraft } from "../types";
 
 interface RelationshipGraphProps {
@@ -52,7 +53,7 @@ const ONTOLOGY_GRAPH_THEME: Theme = {
     activeFill: "#eec05b",
     opacity: 1,
     selectedOpacity: 1,
-    inactiveOpacity: 0.42,
+    inactiveOpacity: 0.78,
     label: {
       activeColor: "#f8d488",
       backgroundColor: "#08101f",
@@ -76,11 +77,11 @@ const ONTOLOGY_GRAPH_THEME: Theme = {
     fill: "#7fa0d5",
     opacity: 1,
     selectedOpacity: 1,
-    inactiveOpacity: 0.28,
+    inactiveOpacity: 0.5,
     label: {
       activeColor: "#f8d488",
       color: "#f1cf86",
-      fontSize: 7,
+      fontSize: 8,
       stroke: "#050816",
     },
     subLabel: {
@@ -110,6 +111,12 @@ const ONTOLOGY_GRAPH_THEME: Theme = {
       stroke: "#050816",
     },
   },
+};
+
+const ONTOLOGY_GRAPH_FOCUS_THEME: Theme = {
+  ...ONTOLOGY_GRAPH_THEME,
+  node: { ...ONTOLOGY_GRAPH_THEME.node, inactiveOpacity: 0.3 },
+  edge: { ...ONTOLOGY_GRAPH_THEME.edge, inactiveOpacity: 0.16 },
 };
 
 export function RelationshipGraph({
@@ -153,6 +160,25 @@ export function RelationshipGraph({
     return statements;
   }, [draft.statements]);
   const graph = useMemo(() => buildOntologyGraphData(draft), [draft]);
+  const legend = useMemo(() => buildGraphLegend(draft), [draft]);
+  const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
+  const [hoveredRelationshipId, setHoveredRelationshipId] = useState<string | null>(null);
+  const neighborhoodByEntityId = useMemo(() => {
+    const neighborhoods = new Map<string, string[]>();
+    for (const edge of graph.edges) {
+      const source = String(edge.source);
+      const target = String(edge.target);
+      for (const [nodeId, neighborId] of [
+        [source, target],
+        [target, source],
+      ]) {
+        const neighborhood = neighborhoods.get(nodeId) ?? [];
+        neighborhood.push(edge.id, neighborId);
+        neighborhoods.set(nodeId, neighborhood);
+      }
+    }
+    return neighborhoods;
+  }, [graph.edges]);
   const graphRenderKey = useMemo(() => buildGraphRenderKey(graph), [graph]);
   const graphCanvasKey = `${graphRenderKey}:${graphAttempt}`;
   const graphFitKey = `${graphCanvasKey}:${graphViewportSize?.width ?? 0}x${
@@ -221,6 +247,69 @@ export function RelationshipGraph({
     );
     return [...new Set(selectedEntityIds)];
   }, [selectedEntityId, selectedRelationship, selectedStatement]);
+  const activeIds = useMemo(() => {
+    const hoveredRelationship = hoveredRelationshipId
+      ? graph.relationshipById.get(hoveredRelationshipId)
+      : null;
+    if (hoveredRelationship) {
+      return [
+        hoveredRelationship.id,
+        hoveredRelationship.subject_entity_id,
+        hoveredRelationship.object_entity_id,
+      ];
+    }
+
+    const anchorEntityId =
+      hoveredEntityId ?? (selectedRelationship ? null : (selectedIds[0] ?? null));
+    if (anchorEntityId) {
+      const neighborhood = neighborhoodByEntityId.get(anchorEntityId) ?? [];
+      return [...new Set([anchorEntityId, ...neighborhood])];
+    }
+    return selectedIds;
+  }, [
+    graph.relationshipById,
+    hoveredEntityId,
+    hoveredRelationshipId,
+    neighborhoodByEntityId,
+    selectedIds,
+    selectedRelationship,
+  ]);
+  const fitGraphToView = useCallback(() => {
+    try {
+      graphRef.current?.fitNodesInView(undefined, { animated: true });
+    } catch {
+      // Camera errors are non-fatal; the user can pan manually.
+    }
+  }, []);
+
+  const lastCenteredSelectionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const selectionKey = selectedIds.join("|");
+    if (!graphFitComplete || selectedIds.length === 0) {
+      lastCenteredSelectionRef.current = null;
+      return;
+    }
+    // Skip the selection present when the graph first fits; only follow
+    // selection changes made after the initial view settles.
+    if (lastCenteredSelectionRef.current === null) {
+      lastCenteredSelectionRef.current = selectionKey;
+      return;
+    }
+    if (lastCenteredSelectionRef.current === selectionKey) {
+      return;
+    }
+    lastCenteredSelectionRef.current = selectionKey;
+    const nodeIds = selectedIds.filter((id) => graph.positionsByEntityId.has(id));
+    if (nodeIds.length === 0) {
+      return;
+    }
+    try {
+      graphRef.current?.fitNodesInView(nodeIds, { animated: true });
+    } catch {
+      // Camera follow is a courtesy; ignore camera errors.
+    }
+  }, [selectedIds, graphFitComplete, graph.positionsByEntityId]);
 
   useEffect(() => {
     fittedGraphKeyRef.current = null;
@@ -299,70 +388,102 @@ export function RelationshipGraph({
 
   return (
     <section className="relationship-graph" aria-label="Relationship graph">
-      <div className="graph-summary">
-        <span>{graph.nodes.length} nodes</span>
-        <span>{graph.edges.length} edges</span>
-      </div>
-
-      <div className="graph-map reagraph-map" ref={setGraphMapElement}>
-        {graphFitError ? (
-          <GraphFailurePanel
-            message="The graph canvas mounted, but fitting the ontology view failed."
-            onRetry={retryGraph}
-            onShowTextView={onShowTextView}
-          />
-        ) : (
-          <GraphErrorBoundary
-            onRetry={retryGraph}
-            onShowTextView={onShowTextView}
-            resetKey={graphCanvasKey}
-          >
-            <Suspense
-              fallback={
-                <div className="graph-loading" role="status" aria-label="Loading graph">
-                  <span aria-hidden="true" />
-                </div>
-              }
+      <div className="graph-map">
+        {/* Overlays live OUTSIDE .reagraph-map: its `> div` rule forces
+            direct children to fill the map and would push the canvas away. */}
+        <div className="graph-legend" aria-label="Graph legend">
+          <span className="graph-legend-title">
+            {graph.nodes.length} entities · {graph.edges.length} relationships
+          </span>
+          {legend.map((item) => (
+            <span className="graph-legend-item" key={item.entityType}>
+              <span
+                aria-hidden
+                className="graph-legend-swatch"
+                style={{ background: item.color }}
+              />
+              {item.label}
+              <span className="graph-legend-count">{item.count}</span>
+            </span>
+          ))}
+        </div>
+        <button
+          aria-label="Fit graph to view"
+          className="graph-fit-button"
+          onClick={fitGraphToView}
+          title="Fit graph to view"
+          type="button"
+        >
+          <Maximize2 size={15} />
+        </button>
+        <div className="graph-canvas-shell reagraph-map" ref={setGraphMapElement}>
+          {graphFitError ? (
+            <GraphFailurePanel
+              message="The graph canvas mounted, but fitting the ontology view failed."
+              onRetry={retryGraph}
+              onShowTextView={onShowTextView}
+            />
+          ) : (
+            <GraphErrorBoundary
+              onRetry={retryGraph}
+              onShowTextView={onShowTextView}
+              resetKey={graphCanvasKey}
             >
-              <ReagraphCanvas
-                actives={selectedIds}
-                aggregateEdges={false}
-                animated
-                cameraMode="pan"
-                defaultNodeSize={10}
-                draggable
-                edgeArrowPosition="end"
-                edgeInterpolation="curved"
-                edgeLabelPosition="natural"
-                edges={graph.edges}
-                key={graphCanvasKey}
-                labelType="all"
-                layoutOverrides={layoutOverrides}
-                layoutType="custom"
-                maxNodeSize={18}
-                minNodeSize={7}
-                nodes={graph.nodes}
-                onEdgeClick={(edge) =>
-                  selectStatementForEdge(edge, statementByRelationshipId, onSelectStatement)
+              <Suspense
+                fallback={
+                  <div className="graph-loading" role="status" aria-label="Loading graph">
+                    <span aria-hidden="true" />
+                  </div>
                 }
-                onNodeClick={(node) =>
-                  selectStatementForNode(
-                    node,
-                    statementByEntityId,
-                    onSelectStatement,
-                    onSelectEntity,
-                  )
-                }
-                ref={setGraphCanvasRef}
-                selections={selectedIds}
-                sizingType="default"
-                theme={ONTOLOGY_GRAPH_THEME}
               >
-                <GraphCanvasReadySignal active={!graphFitComplete} onReady={markGraphReady} />
-              </ReagraphCanvas>
-            </Suspense>
-          </GraphErrorBoundary>
-        )}
+                <ReagraphCanvas
+                  actives={activeIds}
+                  aggregateEdges={false}
+                  animated
+                  cameraMode="pan"
+                  defaultNodeSize={10}
+                  draggable
+                  edgeArrowPosition="end"
+                  edgeInterpolation="curved"
+                  edgeLabelPosition="natural"
+                  edges={graph.edges}
+                  key={graphCanvasKey}
+                  labelType="all"
+                  layoutOverrides={layoutOverrides}
+                  layoutType="custom"
+                  maxNodeSize={25}
+                  minNodeSize={10}
+                  nodes={graph.nodes}
+                  onEdgeClick={(edge) =>
+                    selectStatementForEdge(edge, statementByRelationshipId, onSelectStatement)
+                  }
+                  onEdgePointerOut={() => setHoveredRelationshipId(null)}
+                  onEdgePointerOver={(edge) => setHoveredRelationshipId(edge.id)}
+                  onNodeClick={(node) =>
+                    selectStatementForNode(
+                      node,
+                      statementByEntityId,
+                      onSelectStatement,
+                      onSelectEntity,
+                    )
+                  }
+                  onNodePointerOut={() => setHoveredEntityId(null)}
+                  onNodePointerOver={(node) => setHoveredEntityId(node.id)}
+                  ref={setGraphCanvasRef}
+                  selections={selectedIds}
+                  sizingType="default"
+                  theme={
+                    hoveredEntityId || hoveredRelationshipId
+                      ? ONTOLOGY_GRAPH_FOCUS_THEME
+                      : ONTOLOGY_GRAPH_THEME
+                  }
+                >
+                  <GraphCanvasReadySignal active={!graphFitComplete} onReady={markGraphReady} />
+                </ReagraphCanvas>
+              </Suspense>
+            </GraphErrorBoundary>
+          )}
+        </div>
       </div>
     </section>
   );

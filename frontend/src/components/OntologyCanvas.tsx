@@ -202,7 +202,10 @@ export function OntologyCanvas({
     <section className="ontology-panel" aria-label="Ontology statements">
       {projectDrawer}
       {projectMenuButton}
-      <div className="ontology-workspace-scroll" ref={workspaceScrollRef}>
+      <div
+        className={`ontology-workspace-scroll${canvasView === "graph" ? " graph-mode" : ""}`}
+        ref={workspaceScrollRef}
+      >
         <div className="status-line">
           <span>
             Export readiness <strong>{readiness}%</strong>

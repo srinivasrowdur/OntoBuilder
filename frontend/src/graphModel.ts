@@ -51,7 +51,7 @@ export function buildOntologyGraphData(draft: OntologyDraft): OntologyGraphData 
         id: entity.id,
         label: entity.label,
         labelVisible: true,
-        size: 8 + Math.min(10, degree * 1.4),
+        size: 11 + Math.min(14, degree * 2),
         subLabel: entity.entity_type,
       };
     });
@@ -105,7 +105,7 @@ function buildGraphPositions(entities: Entity[], degreeByEntityId: Map<string, n
     const ringStart = ring * 8;
     const ringIndex = index - ringStart;
     const ringSize = Math.min(8 + ring * 4, outerEntities.length - ringStart);
-    const radius = 175 + ring * 145;
+    const radius = 125 + ring * 105;
     const angle = -Math.PI / 2 + (ringIndex / Math.max(1, ringSize)) * Math.PI * 2;
     positionsByEntityId.set(entity.id, {
       x: Math.cos(angle) * radius,
@@ -146,24 +146,43 @@ function relationshipMeta(relationship: Relationship) {
     .join(" · ");
 }
 
-function entityFill(entityType: string) {
+export function entityFill(entityType: string) {
   switch (entityType) {
     case "role":
-      return "#2b6f7b";
+      return "#3a93a3";
     case "document":
-      return "#5d5fa8";
+      return "#7b7dd4";
     case "event":
-      return "#6f5b2b";
+      return "#9a7d3a";
     case "process":
-      return "#356c51";
+      return "#4a9a72";
     case "state":
-      return "#704965";
+      return "#9a6489";
     case "attribute":
     case "value":
-      return "#6c5d31";
+      return "#948043";
     case "external_reference":
-      return "#526070";
+      return "#6e8296";
     default:
-      return "#24486f";
+      return "#3568a0";
   }
+}
+
+export function entityTypeLabel(entityType: string) {
+  return entityType.replace(/_/g, " ");
+}
+
+export function buildGraphLegend(draft: OntologyDraft) {
+  const counts = new Map<string, number>();
+  for (const entity of draft.entities) {
+    counts.set(entity.entity_type, (counts.get(entity.entity_type) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([entityType, count]) => ({
+      color: entityFill(entityType),
+      count,
+      entityType,
+      label: entityTypeLabel(entityType),
+    }));
 }
