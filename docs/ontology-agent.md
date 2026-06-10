@@ -25,6 +25,17 @@ The CLI also runs a deterministic repair pass before printing output, so omitted
 - `ontology_agent/agent.py`: Agno agent construction with memory, history limits, session summaries, compression, tools, optional vector knowledge, and native folder-based skill loading.
 - `ontology_agent/tools.py`: local knowledge search, existing ontology search, draft validation, skill tools, and guarded learning persistence.
 - `ontology_agent/repair.py`: deterministic statement coverage repair before final JSON output.
+
+Fresh draft generation uses a lean agent profile (`build_ontology_agent(config,
+draft_mode=True)`). In draft mode the agent drafts in a single pass: the
+validate/repair tools are removed from the tool list, and history,
+tool-result compression, session summaries, and memory updates are disabled.
+The consistency checks stay available as the `ontology-consistency-validation`
+skill, which the agent applies as a checklist while drafting; schema validation
+and statement repair then run deterministically on the server
+(`service.response_to_draft` -> `repair_ontology_draft_payload`). This avoids
+re-sending the full draft through the model for validate/repair cycles, which
+dominated generation latency.
 - `ontology_agent/skills/`: extendable skill folders using Agno-style `SKILL.md` files.
 - `ontology_agent/cli.py`: command-line runner.
 

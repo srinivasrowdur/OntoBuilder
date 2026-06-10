@@ -28,8 +28,14 @@ BASE_INSTRUCTIONS = [
     "Return only the structured output requested by the output schema.",
 ]
 
+DRAFT_MODE_INSTRUCTIONS = [
+    "Draft the full ontology in a single pass and emit the structured output directly.",
+    "Apply the ontology-consistency-validation skill as a checklist while drafting; "
+    "deterministic validation and repair run on the server after your response.",
+]
 
-def build_ontology_agent(config: AgentConfig | None = None) -> Any:
+
+def build_ontology_agent(config: AgentConfig | None = None, *, draft_mode: bool = False) -> Any:
     config = config or load_config()
     config.db_path.parent.mkdir(parents=True, exist_ok=True)
     config.vector_path.mkdir(parents=True, exist_ok=True)
@@ -44,11 +50,20 @@ def build_ontology_agent(config: AgentConfig | None = None) -> Any:
         make_identifier,
         search_project_knowledge,
         search_existing_contract_ontology,
-        validate_ontology_draft_json,
-        repair_ontology_draft_json,
-        make_save_learning_tool(knowledge),
     ]
+    if not draft_mode:
+        tools.extend(
+            [
+                validate_ontology_draft_json,
+                repair_ontology_draft_json,
+                make_save_learning_tool(knowledge),
+            ]
+        )
     tools.extend(make_skill_tools(config.skills_dir))
+
+    instructions = list(BASE_INSTRUCTIONS)
+    if draft_mode:
+        instructions.extend(DRAFT_MODE_INSTRUCTIONS)
 
     agent_kwargs: dict[str, Any] = {
         "name": "Ontology Builder",
@@ -57,28 +72,29 @@ def build_ontology_agent(config: AgentConfig | None = None) -> Any:
         "db": SqliteDb(db_file=str(config.db_path)),
         "tools": tools,
         "description": "Builds domain ontologies as entities, relationships, rules, and statements.",
-        "instructions": BASE_INSTRUCTIONS,
+        "instructions": instructions,
         "input_schema": OntologyRequest,
         "output_schema": OntologyDraft,
-        "add_history_to_context": True,
+        "add_history_to_context": not draft_mode,
         "num_history_runs": config.num_history_runs,
         "max_tool_calls_from_history": config.max_tool_calls_from_history,
-        "compress_tool_results": True,
-        "enable_session_summaries": True,
-        "add_session_summary_to_context": True,
-        "tool_call_limit": 20,
+        "compress_tool_results": not draft_mode,
+        "enable_session_summaries": not draft_mode,
+        "add_session_summary_to_context": not draft_mode,
+        "tool_call_limit": 12 if draft_mode else 20,
         "markdown": False,
         "telemetry": config.telemetry,
         "debug_mode": config.debug,
     }
 
-    if "update_memory_on_run" in agent_params:
-        agent_kwargs["update_memory_on_run"] = True
-    elif "enable_user_memories" in agent_params:
-        agent_kwargs["enable_user_memories"] = True
+    if not draft_mode:
+        if "update_memory_on_run" in agent_params:
+            agent_kwargs["update_memory_on_run"] = True
+        elif "enable_user_memories" in agent_params:
+            agent_kwargs["enable_user_memories"] = True
 
-    if "add_memories_to_context" in agent_params:
-        agent_kwargs["add_memories_to_context"] = True
+        if "add_memories_to_context" in agent_params:
+            agent_kwargs["add_memories_to_context"] = True
 
     if knowledge is not None:
         agent_kwargs["knowledge"] = knowledge

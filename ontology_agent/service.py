@@ -47,7 +47,7 @@ def build_draft_from_prompt(
     )
 
     with redirect_stdout(runtime_logs), redirect_stderr(runtime_logs):
-        agent = build_ontology_agent(config)
+        agent = build_ontology_agent(config, draft_mode=True)
         response = agent.run(
             input=request,
             user_id=user_id or config.user_id,
@@ -98,7 +98,11 @@ def response_to_draft(content: Any) -> OntologyDraft:
     if isinstance(content, OntologyDraft):
         return content
     if hasattr(content, "model_dump"):
-        return OntologyDraft.model_validate(content.model_dump(mode="json"))
+        payload = content.model_dump(mode="json")
+        try:
+            return OntologyDraft.model_validate(payload)
+        except Exception:
+            return repair_ontology_draft_payload(payload)
     if isinstance(content, str):
         try:
             return OntologyDraft.model_validate_json(content)

@@ -188,7 +188,7 @@ def _build_entity_expansion_agent(config: AgentConfig) -> Any:
         ],
         "input_schema": EntityExpansionRequest,
         "output_schema": EntityExpansionPlan,
-        "add_history_to_context": True,
+        "add_history_to_context": False,
         "num_history_runs": config.num_history_runs,
         "max_tool_calls_from_history": config.max_tool_calls_from_history,
         "markdown": False,
