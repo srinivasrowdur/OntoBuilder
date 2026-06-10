@@ -24,12 +24,14 @@ import {
 import type {
   DraftReviewSession,
   Entity,
+  GenerationStep,
   NaturalLanguageStatement,
   OntologyDraft,
   ProjectSummary,
   StatementCreatePayload,
 } from "../types";
 import { escapeRegExp } from "../utils/text";
+import { GenerationProgress } from "./GenerationProgress";
 import { NewStatementButton, StatementComposer } from "./StatementComposer";
 import { RelationshipGraph } from "./RelationshipGraph";
 
@@ -37,6 +39,8 @@ interface OntologyCanvasProps {
   canCommit: boolean;
   draft: OntologyDraft | null;
   error: string | null;
+  generationStartedAt: number;
+  generationSteps: GenerationStep[] | null;
   loading: boolean;
   prompt: string;
   projectMessage: string | null;
@@ -79,6 +83,8 @@ export function OntologyCanvas({
   canCommit,
   draft,
   error,
+  generationStartedAt,
+  generationSteps,
   loading,
   onCreateStatement,
   onAcceptAll,
@@ -147,6 +153,11 @@ export function OntologyCanvas({
     </button>
   );
 
+  const generationProgress =
+    generationSteps && generationSteps.length > 0 ? (
+      <GenerationProgress startedAt={generationStartedAt} steps={generationSteps} />
+    ) : null;
+
   if (!draft) {
     return (
       <section className="ontology-panel empty-state">
@@ -171,6 +182,7 @@ export function OntologyCanvas({
             prompt={prompt}
             onSubmit={handlePromptSubmit}
           />
+          {generationProgress}
         </div>
       </section>
     );
@@ -276,6 +288,7 @@ export function OntologyCanvas({
                 draft={draft}
                 onSelectEntity={onSelectEntity}
                 onSelectStatement={onSelectStatement}
+                onShowTextView={() => setCanvasView("statements")}
                 selectedEntityId={selectedEntityId}
                 selectedStatementId={selectedStatementId}
               />
@@ -290,6 +303,7 @@ export function OntologyCanvas({
           <span>{draft.statements.length} statements</span>
         </div>
       </div>
+      {generationProgress}
       <OntologyPromptDock
         canCommit={canCommit}
         canDownload={Boolean(draft)}

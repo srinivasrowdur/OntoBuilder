@@ -1,6 +1,7 @@
 import type {
   CommitResponse,
   DraftReviewSession,
+  DraftStreamEvent,
   Identifier,
   MentionReference,
   ProjectRevisionResponse,
@@ -83,6 +84,82 @@ export function createDraft(prompt: string): Promise<DraftReviewSession> {
     method: "POST",
     body: JSON.stringify({ prompt }),
   });
+}
+
+const STREAM_IDLE_TIMEOUT_MS = 45_000;
+
+export async function streamDraft(
+  prompt: string,
+  onEvent: (event: DraftStreamEvent) => void,
+): Promise<DraftReviewSession> {
+  const controller = new AbortController();
+  let idleTimeoutId = globalThis.setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+  const resetIdleTimeout = () => {
+    globalThis.clearTimeout(idleTimeoutId);
+    idleTimeoutId = globalThis.setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ontology/drafts/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw await apiResponseError(response);
+    }
+    if (!response.body) {
+      throw new Error("Streaming is not supported in this browser.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let session: DraftReviewSession | null = null;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      resetIdleTimeout();
+      buffer += decoder.decode(value, { stream: true });
+
+      let separatorIndex = buffer.indexOf("\n\n");
+      while (separatorIndex >= 0) {
+        const block = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + 2);
+        separatorIndex = buffer.indexOf("\n\n");
+
+        for (const line of block.split("\n")) {
+          if (!line.startsWith("data: ")) {
+            continue;
+          }
+          const event = JSON.parse(line.slice("data: ".length)) as DraftStreamEvent;
+          onEvent(event);
+          if (event.type === "complete" && event.session) {
+            session = event.session;
+          }
+          if (event.type === "error") {
+            throw new Error(event.message ?? "Ontology generation failed.");
+          }
+        }
+      }
+    }
+
+    if (!session) {
+      throw new Error("The stream ended before a draft was completed.");
+    }
+    return session;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The generation stream went quiet and was cancelled.");
+    }
+    throw error instanceof Error ? error : new Error(String(error));
+  } finally {
+    globalThis.clearTimeout(idleTimeoutId);
+  }
 }
 
 export function reviewStatement(

@@ -702,6 +702,30 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.graph-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+.graph-error-actions button {
+  min-height: 2rem;
+  border: 1px solid rgba(123, 169, 244, 0.28);
+  border-radius: 0.42rem;
+  background: rgba(91, 143, 231, 0.14);
+  color: #d8e7ff;
+  padding: 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
+.graph-error-actions button:hover {
+  border-color: rgba(123, 169, 244, 0.55);
+  background: rgba(91, 143, 231, 0.22);
+}
+
 .empty-graph {
   min-height: 14rem;
   place-items: center;
@@ -1847,4 +1871,62 @@ select {
   .flip-view {
     animation: none;
   }
+}
+
+.generation-progress {
+  width: min(640px, 100%);
+  margin: 16px auto 0;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.generation-progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.generation-progress-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.generation-progress-elapsed {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.generation-progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.generation-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.generation-progress-step.active {
+  color: var(--text);
+}
+
+.generation-progress-step.done svg {
+  color: var(--green);
+}
+
+.generation-progress-step.active svg {
+  color: var(--blue);
 }

@@ -103,6 +103,22 @@ export interface DraftReviewSession {
   updated_at: string;
 }
 
+export interface DraftStreamEvent {
+  type: "stage" | "skill" | "heartbeat" | "complete" | "error";
+  stage?: string;
+  message?: string;
+  skill?: string;
+  label?: string;
+  elapsed?: number;
+  session?: DraftReviewSession;
+}
+
+export interface GenerationStep {
+  key: string;
+  label: string;
+  status: "active" | "done";
+}
+
 export interface CommitResponse {
   draft_id: string;
   included_statement_ids: Identifier[];

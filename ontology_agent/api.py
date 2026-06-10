@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Literal
+import json
+from collections.abc import Callable, Iterator
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ontology_agent.config import ROOT, load_config
@@ -34,6 +36,7 @@ from ontology_agent.revision import (
 )
 from ontology_agent.schema import OntologyDraft
 from ontology_agent.service import OntologyRunResult, build_draft_from_prompt
+from ontology_agent.streaming import stream_draft_events
 
 
 class DraftBuildRequest(BaseModel):
@@ -70,6 +73,7 @@ class ProjectRevisionResponse(BaseModel):
 
 
 BuildDraftCallable = Callable[..., OntologyRunResult]
+StreamDraftCallable = Callable[..., Iterator[dict[str, Any]]]
 
 
 def create_app(
@@ -77,6 +81,7 @@ def create_app(
     store: ReviewStore | None = None,
     project_store: ProjectStore | None = None,
     build_draft: BuildDraftCallable = build_draft_from_prompt,
+    stream_draft: StreamDraftCallable = stream_draft_events,
     expand_entity: EntityExpansionCallable | None = None,
 ) -> FastAPI:
     config = load_config()
@@ -231,6 +236,38 @@ def create_app(
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         return review_store.create_session(result.draft, source_prompt=request.prompt)
 
+    @app.post("/api/ontology/drafts/stream", tags=["drafts"])
+    def create_draft_stream(request: DraftBuildRequest) -> StreamingResponse:
+        def event_source() -> Iterator[str]:
+            try:
+                for event in stream_draft(
+                    request.prompt,
+                    scope=request.scope,
+                    jurisdiction=request.jurisdiction,
+                    user_id=request.user_id,
+                    session_id=request.session_id,
+                    config=config,
+                ):
+                    if event.get("type") == "draft":
+                        draft = OntologyDraft.model_validate(event["draft"])
+                        session = review_store.create_session(draft, source_prompt=request.prompt)
+                        yield _sse_event(
+                            {"type": "complete", "session": session.model_dump(mode="json")}
+                        )
+                    else:
+                        yield _sse_event(event)
+            except Exception as exc:
+                yield _sse_event({"type": "error", "message": str(exc)})
+
+        return StreamingResponse(
+            event_source(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     @app.post(
         "/api/ontology/drafts/import",
         response_model=DraftReviewSession,
@@ -355,6 +392,10 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return app
+
+
+def _sse_event(payload: dict[str, Any]) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
 
 
 def _get_session_or_404(store: ReviewStore, draft_id: str) -> DraftReviewSession:

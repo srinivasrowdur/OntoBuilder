@@ -12,6 +12,7 @@ import {
   reviewStatement,
   reviseProject,
   saveProject,
+  streamDraft,
   updateEntityLabel,
 } from "./api";
 import { OntologyCanvas } from "./components/OntologyCanvas";
@@ -26,7 +27,9 @@ import {
 import type {
   CommitResponse,
   DraftReviewSession,
+  DraftStreamEvent,
   Entity,
+  GenerationStep,
   OntologyDraft,
   ProjectSummary,
   ReviewStatus,
@@ -50,6 +53,8 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectSaving, setProjectSaving] = useState(false);
   const [projectMessage, setProjectMessage] = useState<string | null>(null);
+  const [generationSteps, setGenerationSteps] = useState<GenerationStep[] | null>(null);
+  const [generationStartedAt, setGenerationStartedAt] = useState(0);
 
   const baseDraft = useMemo(() => draftForDisplay(session), [session]);
   const draft = useMemo(
@@ -127,8 +132,18 @@ export function App() {
     setLoading(true);
     setError(null);
     setProjectMessage(null);
+    setGenerationSteps([]);
+    setGenerationStartedAt(Date.now());
     try {
-      const nextSession = await createDraft(requestText);
+      const nextSession = await streamDraft(requestText, (event) => {
+        setGenerationSteps((current) => applyStreamEvent(current ?? [], event));
+      }).catch(async (streamError) => {
+        // Older backends have no stream route; fall back to the blocking endpoint.
+        if (streamError instanceof Error && streamError.message.startsWith("API 404")) {
+          return createDraft(requestText);
+        }
+        throw streamError;
+      });
       setReviewSession(nextSession);
       setCommitted(null);
       setPrompt("");
@@ -143,6 +158,7 @@ export function App() {
       setError(errorMessage(nextError));
     } finally {
       setLoading(false);
+      setGenerationSteps(null);
     }
   }
 
@@ -429,6 +445,8 @@ export function App() {
         canCommit={acceptedCount > 0}
         draft={draft}
         error={error}
+        generationStartedAt={generationStartedAt}
+        generationSteps={generationSteps}
         loading={loading}
         onAcceptAll={acceptAllPending}
         onCommit={commitAccepted}
@@ -470,6 +488,31 @@ export function App() {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function applyStreamEvent(steps: GenerationStep[], event: DraftStreamEvent): GenerationStep[] {
+  if (event.type === "stage" && event.stage) {
+    const finished = steps.map((step) =>
+      step.status === "active" ? { ...step, status: "done" as const } : step,
+    );
+    if (finished.some((step) => step.key === event.stage)) {
+      return finished;
+    }
+    return [
+      ...finished,
+      { key: event.stage, label: event.message ?? event.stage, status: "active" },
+    ];
+  }
+  if (event.type === "skill" && event.skill) {
+    if (steps.some((step) => step.key === `skill:${event.skill}`)) {
+      return steps;
+    }
+    return [
+      ...steps,
+      { key: `skill:${event.skill}`, label: event.label ?? event.skill, status: "done" },
+    ];
+  }
+  return steps;
 }
 
 function slug(value: string) {
