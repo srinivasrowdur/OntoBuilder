@@ -2633,3 +2633,65 @@ select {
 .toast-action:hover {
   background: rgba(91, 143, 231, 0.26);
 }
+
+/* Inspector slide-over at narrow widths */
+.sidebar-sheet-scrim,
+.sidebar-sheet-close {
+  display: none;
+}
+
+@media (max-width: 1080px) {
+  .sidebar {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 45;
+    width: min(26rem, 92vw);
+    max-height: none;
+    border-left: 1px solid var(--line);
+    border-top: 0;
+    box-shadow: -1.4rem 0 3.5rem rgba(0, 0, 0, 0.5);
+    transform: translateX(105%);
+    transition: transform 240ms ease;
+  }
+
+  .sidebar.sheet-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-sheet-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    border: 0;
+    background: rgba(4, 6, 11, 0.55);
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar-sheet-close {
+    display: grid;
+    place-items: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border: 1px solid var(--line);
+    border-radius: 0.45rem;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+  }
+
+  .sidebar-sheet-close:hover {
+    color: var(--text);
+  }
+
+  .sidebar .inspector-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

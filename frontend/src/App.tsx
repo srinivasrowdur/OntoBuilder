@@ -61,6 +61,7 @@ export function App() {
   const [generationEntities, setGenerationEntities] = useState<string[]>([]);
   const [generationCounts, setGenerationCounts] = useState<GenerationCounts | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
   const toastIdRef = useRef(0);
 
   const baseDraft = useMemo(() => draftForDisplay(session), [session]);
@@ -506,6 +507,9 @@ export function App() {
   function selectStatement(statementId: string) {
     setSelectedStatementId(statementId);
     setInspectorMode("statement");
+    // No-op on desktop; below the narrow breakpoint the sidebar is a
+    // slide-over that opens on selection.
+    setInspectorSheetOpen(true);
     const statement = draft?.statements.find((candidate) => candidate.id === statementId);
     if (statement?.subject_entity_id) {
       setSelectedEntityId(statement.subject_entity_id);
@@ -515,6 +519,7 @@ export function App() {
   function selectEntity(entityId: Entity["id"]) {
     setSelectedEntityId(entityId);
     setInspectorMode("entity");
+    setInspectorSheetOpen(true);
   }
 
   function previewEntityLabel(entityId: string, label: string | null) {
@@ -596,6 +601,8 @@ export function App() {
         session={session}
       />
       <ReviewSidebar
+        mobileOpen={inspectorSheetOpen}
+        onMobileClose={() => setInspectorSheetOpen(false)}
         draft={draft}
         inspectorMode={inspectorMode}
         onPreviewEntityLabel={previewEntityLabel}
