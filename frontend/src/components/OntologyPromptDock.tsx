@@ -3,6 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import type { Entity } from "../types";
 
+const GRAMMAR_TEMPLATES: Array<{ label: string; template: string; caretAt: number }> = [
+  { label: "Rename…", template: "rename @ to ", caretAt: "rename @".length },
+  { label: "Add relationship…", template: "@ owns one or more @", caretAt: 1 },
+  { label: "Add rule…", template: "@ must have at least one @", caretAt: 1 },
+  { label: "Expand entity…", template: "@ expand relationships", caretAt: 1 },
+];
+
 export function OntologyPromptDock({
   canCommit,
   canDownload,
@@ -21,6 +28,7 @@ export function OntologyPromptDock({
   pendingCount,
   placement = "bottom",
   prompt,
+  reviseMode = false,
 }: {
   canCommit: boolean;
   canDownload: boolean;
@@ -39,6 +47,7 @@ export function OntologyPromptDock({
   pendingCount: number;
   placement?: "bottom" | "center";
   prompt: string;
+  reviseMode?: boolean;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [caretIndex, setCaretIndex] = useState(0);
@@ -70,6 +79,15 @@ export function OntologyPromptDock({
     window.requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+    });
+  }
+
+  function applyTemplate(template: string, caretAt: number) {
+    onPromptChange(template);
+    setCaretIndex(caretAt);
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(caretAt, caretAt);
     });
   }
 
@@ -133,6 +151,22 @@ export function OntologyPromptDock({
             <FileJson size={15} />
             Commit{committableCount > 0 ? ` ${committableCount}` : ""}
           </button>
+        </div>
+      ) : null}
+
+      {placement === "bottom" && reviseMode ? (
+        <div className="grammar-chips" aria-label="Revision commands">
+          <span className="grammar-chips-label">Revise:</span>
+          {GRAMMAR_TEMPLATES.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => applyTemplate(item.template, item.caretAt)}
+              title={item.template.replaceAll("@", "@Entity")}
+              type="button"
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       ) : null}
 

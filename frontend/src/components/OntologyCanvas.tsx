@@ -593,6 +593,7 @@ export function OntologyCanvas({
         pendingCount={pendingCount}
         placement="bottom"
         prompt={prompt}
+        reviseMode={Boolean(selectedProjectId && session)}
         onSubmit={handlePromptSubmit}
       />
     </section>

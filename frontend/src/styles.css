@@ -2636,7 +2636,7 @@ select {
 
 /* Inspector slide-over at narrow widths */
 .sidebar-sheet-scrim,
-.sidebar-sheet-close {
+.sidebar .sidebar-sheet-close {
   display: none;
 }
 
@@ -2668,7 +2668,7 @@ select {
     backdrop-filter: blur(2px);
   }
 
-  .sidebar-sheet-close {
+  .sidebar .sidebar-sheet-close {
     display: grid;
     place-items: center;
     width: 1.9rem;
@@ -2694,4 +2694,37 @@ select {
   .sidebar {
     transition: none;
   }
+}
+
+/* Revision grammar chips */
+.grammar-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.grammar-chips-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grammar-chips button {
+  padding: 0.26rem 0.7rem;
+  border: 1px dashed rgba(214, 224, 244, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: #b9c4d8;
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+
+.grammar-chips button:hover {
+  border-color: rgba(106, 165, 255, 0.55);
+  border-style: solid;
+  color: var(--text);
+  background: rgba(91, 143, 231, 0.1);
 }
