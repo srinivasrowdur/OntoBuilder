@@ -1,32 +1,39 @@
 # OntoBuilder
 
 OntoBuilder is an ontology-building workspace for drafting, reviewing, editing,
-and exporting domain ontologies as structured JSON. The current app uses a
-Python/Agno backend with a React ontology workspace. Users can ask for any
-domain, review the generated ontology as plain-English statements or a
-relationship graph, inspect entities and statements, add new statements, and
-commit only the accepted ontology elements.
+revising, and exporting domain ontologies as structured JSON. It combines a
+Python/FastAPI backend, an Agno-based ontology agent, and a React/Vite review UI.
 
-The repository also includes an earlier contract-intelligence OWL ontology
-starter kit, which remains available under the root ontology files.
+The product shape is statement-first: users ask for any domain, review the
+generated ontology as plain-English statements, inspect the same model as a
+relationship graph, make decisions statement by statement, revise an open
+project with controlled grammar, and commit only the accepted ontology elements.
 
-## What It Does
+The repository also keeps the earlier contract-intelligence OWL starter assets
+under the root ontology files.
 
-- Drafts an ontology for a requested domain with entities, relationships, rules,
-  assumptions, open questions, and competency questions.
-- Renders ontology structure as readable statements, such as
+## Current Capabilities
+
+- Draft an ontology for any requested domain with entities, relationships,
+  rules, assumptions, open questions, and competency questions.
+- Stream draft generation progress over Server-Sent Events, including skill
+  stages, elapsed time, heartbeats, and final review-session creation.
+- Optionally stream entity chips live while the model is drafting, using a cheap
+  parser model for the final structured draft.
+- Review ontology statements in readable form, such as
   `A Member belongs to a Pension Scheme.`
-- Shows a relationship graph for the same ontology using the React graph view.
-- Lets users approve, reject, clarify, edit, or bulk-accept statements.
-- Lets users inspect entities from text chips or graph nodes, then rename them
-  from the entity inspector.
-- Lets users compose new relationship statements from existing or new entities.
-- Lets users compose rule statements with severity, property, operator, and value.
-- Commits accepted/edited statements into a clean, exportable ontology JSON.
-- Saves ontologies into local project folders as Markdown plus JSON.
-- Revises an opened project in-place from the bottom prompt, with `@Entity`
-  mentions resolved against the active ontology.
-- Keeps the frontend as review-state UI and the backend as the source of truth.
+- Inspect the same ontology through a full-bleed Reagraph relationship view with
+  kind colors, legend counts, node sizing, hover focus, and fit-to-view controls.
+- Approve, reject, clarify, edit, bulk-accept, and undo statement decisions.
+- Rename entities from the inspector with undo support.
+- Compose new relationship and rule statements from existing or new entities.
+- Revise an opened project in place with deterministic grammar chips for
+  rename, add relationship, add rule, and expand entity flows.
+- Use keyboard-first triage: move through visible statements and decide them
+  without touching the mouse.
+- Use a command palette for common workspace actions.
+- Save ontologies into local project folders as Markdown plus JSON.
+- Commit accepted/edited statements into a clean, exportable ontology JSON.
 
 ## Architecture
 
@@ -34,7 +41,10 @@ starter kit, which remains available under the root ontology files.
 React/Vite UI
   -> FastAPI review API
     -> Agno ontology agent
+    -> Modular ontology skills
     -> Pydantic ontology schema
+    -> Deterministic validate/repair layer
+    -> Streaming progress pipeline
     -> Review session store
     -> Project folder store
     -> JSON export
@@ -42,15 +52,24 @@ React/Vite UI
 
 Key folders and files:
 
-- `frontend/`: React + TypeScript review UI.
-- `ontology_agent/`: Agno-oriented ontology agent, schemas, tools, API, and review store.
-- `projects/`: optional local folder-backed knowledge base for saved ontology projects.
-- `ontology_agent/skills/`: modular skills for scope control, concept gathering,
-  relationship design, rule design, statement rendering, validation, and JSON export.
+- `frontend/`: React + TypeScript ontology review workspace.
+- `frontend/src/components/`: canvas, graph, inspector, drawer, dock, toasts,
+  command palette, first-run, and generation-progress UI components.
+- `frontend/src/graphModel.ts`: reusable graph node/edge/position derivation.
+- `frontend/src/designTokens.ts` and `frontend/src/tokens.css`: shared kind,
+  status, typography, and button tokens.
+- `ontology_agent/`: Agno agent setup, API, schema, review logic, revision
+  grammar, streaming, project storage, and deterministic repair.
+- `ontology_agent/skills/`: modular skill folders for scope control, domain
+  discovery, concept gathering, relationship design, rule design, statement
+  rendering, consistency validation, entity expansion, and JSON export.
+- `projects/`: optional local folder-backed knowledge base for saved ontology
+  projects.
 - `examples/retirements-ontology-draft.json`: sample draft that the UI can load
   without calling an LLM.
-- `docs/ontology-agent.md`: deeper agent and API notes.
-- `tests/`: schema, tools, API, and UI-adjacent tests.
+- `docs/ontology-agent.md`: deeper backend, skill, and streaming notes.
+- `docs/design-system.md`: design token and UI styling reference.
+- `tests/`: Python API, agent, config, streaming, schema, and tooling tests.
 
 ## Setup
 
@@ -71,32 +90,35 @@ npm install
 cd ..
 ```
 
-For real Agno-backed ontology generation, set the API key for the provider you
-want to use:
+Create a local `.env` from `.env.example`, then set the provider keys you need:
 
 ```sh
-export OPENAI_API_KEY="..."
-export GOOGLE_API_KEY="..."
+cp .env.example .env
 ```
 
-Configure the active provider in `.env`:
+Common environment values:
 
 ```sh
+OPENAI_API_KEY=...
+GOOGLE_API_KEY=...
 ONTOLOGY_AGENT_PROVIDER=google
 ONTOLOGY_AGENT_GOOGLE_MODEL=google:gemini-2.5-flash
 ONTOLOGY_AGENT_OPENAI_MODEL=openai:gpt-5.2
+ONTOLOGY_AGENT_MODEL=
+ONTOLOGY_AGENT_PARSER_MODEL=
+ONTOLOGY_AGENT_BASE_IRI=
+ONTOLOGY_AGENT_PROJECTS_PATH=projects
 ```
 
-Use `ONTOLOGY_AGENT_PROVIDER=openai` or `ONTOLOGY_AGENT_PROVIDER=google` to
-switch between configured providers. If `ONTOLOGY_AGENT_MODEL` is set, that
-exact Agno model string overrides the provider-specific selection.
+Provider selection:
 
-Project folders are saved to `projects/` by default. To store them somewhere
-else, set:
-
-```sh
-ONTOLOGY_AGENT_PROJECTS_PATH="/path/to/ontology-projects"
-```
+- `ONTOLOGY_AGENT_PROVIDER=google` uses `ONTOLOGY_AGENT_GOOGLE_MODEL`.
+- `ONTOLOGY_AGENT_PROVIDER=openai` uses `ONTOLOGY_AGENT_OPENAI_MODEL`.
+- `ONTOLOGY_AGENT_MODEL` overrides the provider-specific model when set.
+- `ONTOLOGY_AGENT_PARSER_MODEL=none` disables live entity streaming and uses
+  native structured output instead.
+- `ONTOLOGY_AGENT_BASE_IRI` controls generated ontology namespaces. If unset,
+  the app uses the configured default instead of `example.*` export IRIs.
 
 The React UI can still load the retirements sample without calling an LLM.
 
@@ -123,21 +145,41 @@ Open:
 
 ## UI Workflow
 
-1. Open the React UI and either ask for a new ontology in the `Create ontology`
-   prompt, open an existing project from the hamburger project drawer, or load
-   the retirements sample for an offline demo.
-2. After a draft exists, use the `Text` view to review readable statements or
-   switch to `Graph` to inspect the relationship network.
-3. Select a statement row or graph edge to open the statement inspector, then
-   approve, reject, clarify, or edit the statement text.
-4. Select an entity chip or graph node to open the entity inspector, then rename
-   the entity and save or discard the change.
-5. Click `+ Statement` to add a new relationship or rule statement.
-6. Open the hamburger project drawer to create, open, or save a project.
-7. With a project open, use the bottom prompt for scoped edits such as
-   `@Member owns one or more @Account` or `rename @Member to Plan Member`.
-8. Click `Commit accepted` to build the final ontology from accepted/edited statements.
-9. Download the resulting JSON.
+1. Open the React UI.
+2. Create a new ontology from the first-run prompt, choose an example prompt
+   card, open an existing project, or load the offline retirements sample.
+3. Watch the generation progress card while the backend streams skill stages,
+   entity chips, elapsed time, and completion.
+4. Use the readiness funnel to work through `Review -> Resolve -> Export`.
+5. Review statements in the `Text` view or switch to `Graph` to inspect the
+   relationship network.
+6. Select a statement row or graph edge to open the statement inspector.
+7. Select an entity chip or graph node to open the entity inspector.
+8. Decide statements with inspector buttons, row actions, bulk accept, or
+   keyboard triage.
+9. Use `+ Statement` to add a relationship or rule statement.
+10. Open the project drawer to create, open, or save a project.
+11. With a project open, use the revise dock grammar chips to make controlled
+    edits against stable `@Entity` mentions.
+12. Commit accepted/edited statements to build the final ontology.
+13. Download the resulting JSON.
+
+## Keyboard And Command Palette
+
+The review workflow is designed for fast triage:
+
+- `j` or ArrowDown: move to the next visible statement.
+- `k` or ArrowUp: move to the previous visible statement.
+- `a`: accept the selected statement.
+- `r`: reject the selected statement.
+- `c`: mark the selected statement as needing clarification.
+- `p`: return the selected statement to pending.
+- `Cmd/Ctrl+K`: open the command palette.
+- `Escape`: close overlays such as the command palette, drawer, or mobile
+  inspector sheet.
+
+Keyboard handling ignores keystrokes while the user is typing in forms,
+composer fields, or prompt inputs.
 
 ## Project Folders
 
@@ -169,20 +211,21 @@ Git. The JSON files remain the app's exact machine-readable representation.
 
 ## Project-Scoped Revisions
 
-Once a project is open, the bottom prompt acts on that ontology instead of
+Once a project is open, the bottom dock acts on that ontology instead of
 starting over. The UI sends `@Entity` mentions with stable entity IDs, and the
-backend currently supports deterministic edits for:
+backend supports deterministic edits for:
 
-- renaming one entity, for example `rename @Member to Plan Member`
-- adding a relationship between two entities, for example
-  `@Member owns one or more @Account`
-- adding a rule for one entity, optionally referencing another entity, for
-  example `@Issue must have at least one @Remediation Plan`
-- expanding one entity through the ontology expansion agent with additional
-  candidate relationships, entities, and rules, for example
-  `@Cricket Match Expand on this entity to cover more`
-- aiming that same agent at a narrower expansion mode, for example
-  `@Cricket Match expand relationships` or `@Cricket Match expand rules`
+- Rename one entity, for example `rename @Member to Plan Member`.
+- Add a relationship between two entities, for example
+  `@Member owns one or more @Account`.
+- Add a rule for one entity, optionally referencing another entity, for example
+  `@Issue must have at least one @Remediation Plan`.
+- Expand one entity through the ontology expansion agent, for example
+  `@Cricket Match expand relationships`.
+
+The revise dock shows grammar chips for the supported forms. Clicking a chip
+inserts the template and places the caret where the next `@Entity` mention
+should be selected.
 
 Every successful project revision updates the review session and immediately
 rewrites the Markdown/JSON project folder.
@@ -231,8 +274,9 @@ Core routes:
 - `GET /api/projects/{project_id}/session`
 - `POST /api/projects/{project_id}/revise`
 - `POST /api/ontology/drafts`
+- `POST /api/ontology/drafts/stream`
 - `POST /api/ontology/drafts/import`
-- `POST /api/ontology/drafts/samples/retirements`
+- `POST /api/ontology/drafts/samples/{sample_name}`
 - `GET /api/ontology/drafts/{draft_id}`
 - `POST /api/ontology/drafts/{draft_id}/statements`
 - `PATCH /api/ontology/drafts/{draft_id}/statements/{statement_id}`
@@ -240,6 +284,9 @@ Core routes:
 - `PATCH /api/ontology/drafts/{draft_id}/entities/{entity_id}`
 - `POST /api/ontology/drafts/{draft_id}/commit`
 - `GET /api/ontology/drafts/{draft_id}/export`
+
+The frontend uses the streaming endpoint first for draft creation and falls
+back to the blocking endpoint when streaming is unavailable.
 
 ## CLI Usage
 
@@ -278,10 +325,13 @@ python -m ruff check ontology_agent tests
 python -m ruff format --check ontology_agent tests
 ```
 
-Build the React frontend:
+Run frontend tests, linting, formatting, and build:
 
 ```sh
 cd frontend
+npm run test:run
+npm run lint
+npm run format:check
 npm run build
 ```
 
@@ -302,6 +352,22 @@ Regenerate ontology diagrams:
 ```sh
 /Users/srinivas/anaconda3/bin/python scripts/generate_ontology_visuals.py
 ```
+
+## Design System
+
+The frontend now has explicit design tokens for:
+
+- entity kind colors
+- review status colors
+- typography scale
+- button variants
+- graph colors
+
+The CSS source of truth is `frontend/src/tokens.css`. The TypeScript mirror for
+graph and logic usage is `frontend/src/designTokens.ts`, covered by
+`frontend/src/designTokens.test.ts`.
+
+See `docs/design-system.md` for the token reference.
 
 ## Contract Ontology Assets
 
