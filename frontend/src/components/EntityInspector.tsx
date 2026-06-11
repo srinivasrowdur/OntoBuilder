@@ -235,7 +235,9 @@ function namespaceIri(draft: OntologyDraft) {
   if (/^https?:\/\//.test(suggestion)) {
     return /[#/]$/.test(suggestion) ? suggestion : `${suggestion}#`;
   }
-  return `https://example.org/ontology/${namespacePath(suggestion || draft.domain)}#`;
+  // The backend normalizes namespaces to ONTOLOGY_AGENT_BASE_IRI; this
+  // fallback only covers drafts saved before that normalization existed.
+  return `https://ontobuilder.local/ontology/${namespacePath(suggestion || draft.domain)}#`;
 }
 
 function entityLocalName(entity: Entity) {

@@ -142,3 +142,21 @@ def test_local_skill_folders_load_with_native_agno_skills():
     assert skills.get_skill("retirement-ontology").instructions.startswith(
         "# Retirement Ontology Skill"
     )
+
+
+def test_apply_base_iri_normalizes_namespace():
+    from ontology_agent.config import AgentConfig
+    from ontology_agent.config import ROOT as config_root
+    from ontology_agent.schema import OntologyDraft
+    from ontology_agent.service import apply_base_iri
+
+    draft = OntologyDraft.model_validate_json(
+        (config_root / "examples" / "retirements-ontology-draft.json").read_text()
+    )
+    config = AgentConfig(base_iri="https://rowdur.com/ontology")
+    updated = apply_base_iri(draft, config)
+    assert updated.namespace_suggestion == "https://rowdur.com/ontology/retirements#"
+
+    default_updated = apply_base_iri(draft, AgentConfig())
+    assert default_updated.namespace_suggestion.startswith("https://ontobuilder.local/ontology/")
+    assert "example.com" not in default_updated.namespace_suggestion

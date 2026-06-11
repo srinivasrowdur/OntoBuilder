@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   bulkReview,
   commitDraft,
@@ -17,6 +17,8 @@ import {
 } from "./api";
 import { OntologyCanvas } from "./components/OntologyCanvas";
 import { ReviewSidebar } from "./components/ReviewSidebar";
+import { ToastStack } from "./components/Toasts";
+import type { ToastItem } from "./components/Toasts";
 import { draftForDisplay, getReviewCounts } from "./ontology";
 import {
   applyPreviewOverrides,
@@ -58,6 +60,8 @@ export function App() {
   const [generationStartedAt, setGenerationStartedAt] = useState(0);
   const [generationEntities, setGenerationEntities] = useState<string[]>([]);
   const [generationCounts, setGenerationCounts] = useState<GenerationCounts | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastIdRef = useRef(0);
 
   const baseDraft = useMemo(() => draftForDisplay(session), [session]);
   const draft = useMemo(
@@ -96,6 +100,28 @@ export function App() {
   useEffect(() => {
     void refreshProjects();
   }, []);
+
+  const pushToast = useCallback((tone: ToastItem["tone"], message: string) => {
+    toastIdRef.current += 1;
+    const id = toastIdRef.current;
+    setToasts((current) => [...current.slice(-3), { id, message, tone }]);
+  }, []);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      pushToast("error", error);
+    }
+  }, [error, pushToast]);
+
+  useEffect(() => {
+    if (projectMessage) {
+      pushToast("success", projectMessage);
+    }
+  }, [projectMessage, pushToast]);
 
   useEffect(() => {
     if (!draft) {
@@ -466,11 +492,11 @@ export function App() {
 
   return (
     <main className="app-shell">
+      <ToastStack onDismiss={dismissToast} toasts={toasts} />
       <OntologyCanvas
         canCommit={acceptedCount > 0}
         hasCommitted={Boolean(committed)}
         draft={draft}
-        error={error}
         generationCounts={generationCounts}
         generationEntities={generationEntities}
         generationStartedAt={generationStartedAt}

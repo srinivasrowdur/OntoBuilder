@@ -32,6 +32,8 @@ import type {
   StatementCreatePayload,
 } from "../types";
 import { escapeRegExp } from "../utils/text";
+import { CommandPalette } from "./CommandPalette";
+import type { PaletteCommand } from "./CommandPalette";
 import { GenerationProgress } from "./GenerationProgress";
 import { NewStatementButton, StatementComposer } from "./StatementComposer";
 import { RelationshipGraph } from "./RelationshipGraph";
@@ -39,7 +41,6 @@ import { RelationshipGraph } from "./RelationshipGraph";
 interface OntologyCanvasProps {
   canCommit: boolean;
   draft: OntologyDraft | null;
-  error: string | null;
   generationCounts: GenerationCounts | null;
   generationEntities: string[];
   generationStartedAt: number;
@@ -106,7 +107,6 @@ type StatementPart =
 export function OntologyCanvas({
   canCommit,
   draft,
-  error,
   generationCounts,
   generationEntities,
   generationStartedAt,
@@ -157,6 +157,119 @@ export function OntologyCanvas({
     session?.statements.filter((review) => review.status === "pending").length ?? 0;
   const blockingStatuses = new Set(["pending", "needs_clarification"]);
   const showWorklist = worklistOpen && readinessReport.blockingCount > 0;
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    function handleGlobalKeyDown(event: globalThis.KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+  const paletteCommands = useMemo<PaletteCommand[]>(() => {
+    const commands: PaletteCommand[] = [
+      {
+        id: "new-ontology",
+        title: "Create a new ontology",
+        hint: "focus the prompt",
+        action: () => {
+          document.querySelector<HTMLTextAreaElement>(".prompt-compose textarea")?.focus();
+        },
+      },
+      {
+        id: "load-sample",
+        title: "Load the retirements sample",
+        hint: "works offline",
+        action: () => onLoadSample(),
+      },
+    ];
+    if (draft) {
+      commands.push(
+        {
+          id: "view-text",
+          title: "Switch to text view",
+          action: () => setCanvasView("statements"),
+        },
+        {
+          id: "view-graph",
+          title: "Switch to graph view",
+          action: () => setCanvasView("graph"),
+        },
+        {
+          id: "download-json",
+          title: "Download ontology JSON",
+          action: () => onDownload(),
+        },
+      );
+      if (readinessReport.blockingCount > 0) {
+        commands.push({
+          id: "worklist",
+          title: `Show worklist (${readinessReport.blockingCount} need a decision)`,
+          action: () => {
+            setCanvasView("statements");
+            setWorklistOpen(true);
+          },
+        });
+      }
+      if (pendingCount > 0) {
+        commands.push({
+          id: "accept-all",
+          title: `Accept all pending statements (${pendingCount})`,
+          action: () => onAcceptAll(),
+        });
+      }
+      if (canCommit) {
+        commands.push({
+          id: "commit",
+          title: `Commit ${readinessReport.committableCount} accepted statements`,
+          action: () => onCommit(),
+        });
+      }
+      if (selectedProjectId && session) {
+        commands.push({
+          id: "save-project",
+          title: "Save project",
+          action: () => void onProjectSave(),
+        });
+      }
+    }
+    for (const project of projects) {
+      commands.push({
+        id: `open-${project.id}`,
+        title: `Open project: ${project.name}`,
+        hint: project.domain ?? undefined,
+        action: () => void onProjectOpen(project.id),
+      });
+    }
+    return commands;
+  }, [
+    canCommit,
+    draft,
+    onAcceptAll,
+    onCommit,
+    onDownload,
+    onLoadSample,
+    onProjectOpen,
+    onProjectSave,
+    pendingCount,
+    projects,
+    readinessReport.blockingCount,
+    readinessReport.committableCount,
+    selectedProjectId,
+    session,
+  ]);
+
+  const commandPalette = (
+    <CommandPalette
+      commands={paletteCommands}
+      onClose={() => setPaletteOpen(false)}
+      open={paletteOpen}
+    />
+  );
 
   function handlePromptSubmit(event: FormEvent) {
     event.preventDefault();
@@ -203,6 +316,7 @@ export function OntologyCanvas({
     const recentProjects = projects.filter((project) => project.draft_id).slice(0, 3);
     return (
       <section className="ontology-panel empty-state">
+        {commandPalette}
         {projectDrawer}
         {projectMenuButton}
         <div className="empty-canvas-center">
@@ -220,7 +334,6 @@ export function OntologyCanvas({
             canCommit={false}
             canDownload={false}
             entities={[]}
-            error={error}
             loading={loading}
             onAcceptAll={onAcceptAll}
             onCommit={onCommit}
@@ -234,6 +347,16 @@ export function OntologyCanvas({
             onSubmit={handlePromptSubmit}
           />
           {generationProgress}
+          {loading && !generationProgress ? (
+            <div aria-label="Loading ontology" className="skeleton-list" role="status">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div className="skeleton-row" key={row}>
+                  <span className="skeleton-bar skeleton-kicker" />
+                  <span className={`skeleton-bar skeleton-line-${(row % 3) + 1}`} />
+                </div>
+              ))}
+            </div>
+          ) : null}
           {!isGenerating ? (
             <div className="first-run-suggestions">
               <div className="example-prompts" aria-label="Example ontologies">
@@ -278,6 +401,7 @@ export function OntologyCanvas({
 
   return (
     <section className="ontology-panel" aria-label="Ontology statements">
+      {commandPalette}
       {projectDrawer}
       {projectMenuButton}
       <div
@@ -464,7 +588,6 @@ export function OntologyCanvas({
         commitEmphasis={readinessReport.stage === "export" && canCommit && !hasCommitted}
         committableCount={readinessReport.committableCount}
         downloadEmphasis={hasCommitted}
-        error={error}
         entities={draft.entities}
         loading={loading}
         onAcceptAll={onAcceptAll}
@@ -635,7 +758,6 @@ function OntologyPromptDock({
   committableCount = 0,
   downloadEmphasis = false,
   entities,
-  error,
   loading,
   onAcceptAll,
   onCommit,
@@ -654,7 +776,6 @@ function OntologyPromptDock({
   committableCount?: number;
   downloadEmphasis?: boolean;
   entities: Entity[];
-  error: string | null;
   loading: boolean;
   onAcceptAll: () => void;
   onCommit: () => void;
@@ -762,8 +883,6 @@ function OntologyPromptDock({
           </button>
         </div>
       ) : null}
-
-      {error ? <div className="dock-error">{error}</div> : null}
 
       <div className="prompt-compose">
         {showMentionOptions ? (

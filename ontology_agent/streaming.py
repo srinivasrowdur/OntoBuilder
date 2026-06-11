@@ -10,7 +10,7 @@ from typing import Any
 from ontology_agent.agent import build_ontology_agent
 from ontology_agent.config import AgentConfig, load_config
 from ontology_agent.schema import OntologyRequest
-from ontology_agent.service import parse_freeform_request, response_to_draft
+from ontology_agent.service import apply_base_iri, parse_freeform_request, response_to_draft
 from ontology_agent.skills import plan_ontology_skills
 
 
@@ -232,7 +232,7 @@ def stream_draft_events(
 
     yield {"type": "stage", "stage": "validating", "message": "Validating and repairing the draft"}
     try:
-        draft = response_to_draft(final_content)
+        draft = apply_base_iri(response_to_draft(final_content), config)
     except Exception as exc:
         yield {"type": "error", "message": f"Draft validation failed: {exc}"}
         return

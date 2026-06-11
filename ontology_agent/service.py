@@ -22,6 +22,20 @@ class OntologyRunResult:
     scope: str | None
 
 
+def apply_base_iri(draft: OntologyDraft, config: AgentConfig) -> OntologyDraft:
+    """Normalize the draft namespace to the configured base IRI.
+
+    The model's namespace suggestion is advisory; the server owns the
+    namespace policy so exported IRIs never point at example.* domains.
+    """
+    from ontology_agent.tools import make_identifier
+
+    namespace = f"{config.base_iri.rstrip('/#')}/{make_identifier(draft.domain)}#"
+    if draft.namespace_suggestion == namespace:
+        return draft
+    return draft.model_copy(update={"namespace_suggestion": namespace})
+
+
 def build_draft_from_prompt(
     prompt: str,
     *,
@@ -55,7 +69,7 @@ def build_draft_from_prompt(
         )
 
     return OntologyRunResult(
-        draft=response_to_draft(response.content),
+        draft=apply_base_iri(response_to_draft(response.content), config),
         logs=runtime_logs.getvalue(),
         domain=domain,
         scope=resolved_scope,

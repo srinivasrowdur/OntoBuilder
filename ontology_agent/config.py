@@ -34,6 +34,7 @@ class AgentConfig:
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODELS[DEFAULT_PROVIDER]
     parser_model: str = DEFAULT_PARSER_MODELS[DEFAULT_PROVIDER]
+    base_iri: str = "https://ontobuilder.local/ontology"
     vector_db: str = "none"
     user_id: str = "local-user"
     session_id: str = "ontology-builder"
@@ -63,6 +64,8 @@ def load_config() -> AgentConfig:
         provider=provider,
         model=_resolve_model(provider),
         parser_model=_resolve_parser_model(provider),
+        base_iri=os.getenv("ONTOLOGY_AGENT_BASE_IRI", "https://ontobuilder.local/ontology").strip()
+        or "https://ontobuilder.local/ontology",
         vector_db=os.getenv("ONTOLOGY_AGENT_VECTOR_DB", "none").lower(),
         user_id=os.getenv("ONTOLOGY_AGENT_USER_ID", "local-user"),
         session_id=os.getenv("ONTOLOGY_AGENT_SESSION_ID", "ontology-builder"),
