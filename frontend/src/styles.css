@@ -2618,3 +2618,18 @@ select {
     display: none;
   }
 }
+
+.toast-action {
+  flex: none;
+  padding: 0.22rem 0.6rem;
+  border: 1px solid rgba(106, 165, 255, 0.45);
+  border-radius: 0.4rem;
+  background: rgba(91, 143, 231, 0.14);
+  color: var(--blue-text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.toast-action:hover {
+  background: rgba(91, 143, 231, 0.26);
+}

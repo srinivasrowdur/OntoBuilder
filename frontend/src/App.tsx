@@ -19,7 +19,7 @@ import { OntologyCanvas } from "./components/OntologyCanvas";
 import { ReviewSidebar } from "./components/ReviewSidebar";
 import { ToastStack } from "./components/Toasts";
 import type { ToastItem } from "./components/Toasts";
-import { draftForDisplay, getReviewCounts } from "./ontology";
+import { draftForDisplay, getReviewCounts, STATUS_LABELS } from "./ontology";
 import {
   applyPreviewOverrides,
   extractPromptMentions,
@@ -101,11 +101,21 @@ export function App() {
     void refreshProjects();
   }, []);
 
-  const pushToast = useCallback((tone: ToastItem["tone"], message: string) => {
-    toastIdRef.current += 1;
-    const id = toastIdRef.current;
-    setToasts((current) => [...current.slice(-3), { id, message, tone }]);
-  }, []);
+  const pushToast = useCallback(
+    (
+      tone: ToastItem["tone"],
+      message: string,
+      options?: { action?: ToastItem["action"]; key?: string },
+    ) => {
+      toastIdRef.current += 1;
+      const id = toastIdRef.current;
+      setToasts((current) => [
+        ...current.filter((toast) => !options?.key || toast.key !== options.key).slice(-3),
+        { action: options?.action, id, key: options?.key, message, tone },
+      ]);
+    },
+    [],
+  );
 
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -259,12 +269,35 @@ export function App() {
     if (!session) {
       return;
     }
+    const sessionId = session.id;
+    const previous = session.statements.find((review) => review.statement.id === statementId);
     setError(null);
     try {
-      await reviewStatement(session.id, statementId, status, text);
-      setReviewSession(await getDraft(session.id));
+      await reviewStatement(sessionId, statementId, status, text);
+      setReviewSession(await getDraft(sessionId));
       setStatementTextPreviews((current) => omitKey(current, statementId));
       setCommitted(null);
+      if (previous && (previous.status !== status || text !== undefined)) {
+        const previousStatus = previous.status;
+        const previousText = previous.statement.text;
+        pushToast("success", `Statement ${STATUS_LABELS[status].toLowerCase()}`, {
+          key: "statement-undo",
+          action: {
+            label: "Undo",
+            onAction: () => {
+              void (async () => {
+                try {
+                  await reviewStatement(sessionId, statementId, previousStatus, previousText);
+                  setReviewSession(await getDraft(sessionId));
+                  setCommitted(null);
+                } catch (undoError) {
+                  setError(errorMessage(undoError));
+                }
+              })();
+            },
+          },
+        });
+      }
     } catch (nextError) {
       setError(errorMessage(nextError));
       throw nextError;
@@ -281,10 +314,27 @@ export function App() {
     if (pendingIds.length === 0) {
       return;
     }
+    const sessionId = session.id;
     setError(null);
     try {
-      setReviewSession(await bulkReview(session.id, "accepted", pendingIds));
+      setReviewSession(await bulkReview(sessionId, "accepted", pendingIds));
       setCommitted(null);
+      pushToast("success", `Accepted ${pendingIds.length} pending statements`, {
+        key: "statement-undo",
+        action: {
+          label: "Undo",
+          onAction: () => {
+            void (async () => {
+              try {
+                setReviewSession(await bulkReview(sessionId, "pending", pendingIds));
+                setCommitted(null);
+              } catch (undoError) {
+                setError(errorMessage(undoError));
+              }
+            })();
+          },
+        },
+      });
     } catch (nextError) {
       setError(errorMessage(nextError));
     }
@@ -306,11 +356,31 @@ export function App() {
     if (!session) {
       return;
     }
+    const sessionId = session.id;
+    const previousLabel = session.draft.entities.find((entity) => entity.id === entityId)?.label;
     setError(null);
     try {
-      setReviewSession(await updateEntityLabel(session.id, entityId, label));
+      setReviewSession(await updateEntityLabel(sessionId, entityId, label));
       setEntityLabelPreviews((current) => omitKey(current, entityId));
       setCommitted(null);
+      if (previousLabel && previousLabel !== label) {
+        pushToast("success", `Renamed "${previousLabel}" to "${label}"`, {
+          key: "entity-undo",
+          action: {
+            label: "Undo",
+            onAction: () => {
+              void (async () => {
+                try {
+                  setReviewSession(await updateEntityLabel(sessionId, entityId, previousLabel));
+                  setCommitted(null);
+                } catch (undoError) {
+                  setError(errorMessage(undoError));
+                }
+              })();
+            },
+          },
+        });
+      }
     } catch (nextError) {
       setError(errorMessage(nextError));
       throw nextError;

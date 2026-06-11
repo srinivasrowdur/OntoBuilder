@@ -1,13 +1,22 @@
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { useEffect } from "react";
 
+export interface ToastAction {
+  label: string;
+  onAction: () => void;
+}
+
 export interface ToastItem {
   id: number;
   tone: "error" | "success";
   message: string;
+  /** Toasts sharing a key replace each other instead of stacking. */
+  key?: string;
+  action?: ToastAction;
 }
 
 const TOAST_DISMISS_MS = 6000;
+const ACTION_TOAST_DISMISS_MS = 9000;
 
 export function ToastStack({
   onDismiss,
@@ -21,7 +30,10 @@ export function ToastStack({
       return;
     }
     const timers = toasts.map((toast) =>
-      globalThis.setTimeout(() => onDismiss(toast.id), TOAST_DISMISS_MS),
+      globalThis.setTimeout(
+        () => onDismiss(toast.id),
+        toast.action ? ACTION_TOAST_DISMISS_MS : TOAST_DISMISS_MS,
+      ),
     );
     return () => {
       for (const timer of timers) {
@@ -44,6 +56,18 @@ export function ToastStack({
             <CheckCircle2 aria-hidden size={15} />
           )}
           <span>{toast.message}</span>
+          {toast.action ? (
+            <button
+              className="toast-action"
+              onClick={() => {
+                onDismiss(toast.id);
+                toast.action?.onAction();
+              }}
+              type="button"
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
           <button
             aria-label="Dismiss notification"
             onClick={() => onDismiss(toast.id)}
