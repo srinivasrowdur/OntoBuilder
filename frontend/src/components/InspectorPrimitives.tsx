@@ -14,6 +14,7 @@ export function EntityLink({
   return (
     <button
       className="inspector-link-button"
+      data-kind={entity?.entity_type ?? "class"}
       onClick={() => onSelectEntity(entityId)}
       type="button"
     >

@@ -1,3 +1,5 @@
+@import "./tokens.css";
+
 :root {
   --bg: #08090d;
   --panel: #11131a;
@@ -569,15 +571,15 @@ button:disabled {
 
 .statement-row.accepted .statement-status,
 .statement-row.edited .statement-status {
-  background: var(--green);
+  background: var(--status-accepted);
 }
 
 .statement-row.rejected .statement-status {
-  background: var(--red);
+  background: var(--status-rejected);
 }
 
 .statement-row.needs_clarification .statement-status {
-  background: var(--gold-text);
+  background: var(--status-clarify);
 }
 
 .relationship-graph {
@@ -819,9 +821,9 @@ button:disabled {
 }
 
 .chip.entity {
-  color: var(--blue-text);
-  background: var(--blue-bg);
-  border: 1px solid rgba(91, 143, 231, 0.9);
+  color: color-mix(in srgb, var(--kind) 34%, white);
+  background: color-mix(in srgb, var(--kind) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kind) 85%, white 8%);
 }
 
 .chip.constraint {
@@ -836,7 +838,7 @@ button:disabled {
 
 .entity-chip.selected-entity {
   border-color: rgba(248, 212, 136, 0.94);
-  background: #1b3b62;
+  background: color-mix(in srgb, var(--kind) 55%, #08101f);
   color: #f4f8ff;
   box-shadow:
     0 0 0 1px rgba(248, 212, 136, 0.2),
@@ -881,9 +883,9 @@ button:disabled {
 
 .inline-chip-select {
   max-width: 18ch;
-  border: 1px solid rgba(91, 143, 231, 0.9);
-  background: var(--blue-bg);
-  color: var(--blue-text);
+  border: 1px solid color-mix(in srgb, var(--kind, var(--kind-class)) 85%, white 8%);
+  background: color-mix(in srgb, var(--kind, var(--kind-class)) 30%, transparent);
+  color: color-mix(in srgb, var(--kind, var(--kind-class)) 34%, white);
   padding: 0 0.34em;
 }
 
@@ -1561,21 +1563,21 @@ select {
 
 .status-pill.accepted,
 .status-pill.edited {
-  color: #bff5d3;
-  background: rgba(50, 150, 92, 0.16);
-  border-color: rgba(96, 205, 137, 0.3);
+  color: var(--status-accepted-text);
+  background: var(--status-accepted-bg);
+  border-color: var(--status-accepted-border);
 }
 
 .status-pill.rejected {
-  color: #ffc5c5;
-  background: rgba(157, 45, 45, 0.18);
-  border-color: rgba(255, 120, 120, 0.25);
+  color: var(--status-rejected-text);
+  background: var(--status-rejected-bg);
+  border-color: var(--status-rejected-border);
 }
 
 .status-pill.needs_clarification {
-  color: var(--gold-text);
-  background: rgba(215, 168, 76, 0.12);
-  border-color: rgba(215, 168, 76, 0.28);
+  color: var(--status-clarify-text);
+  background: var(--status-clarify-bg);
+  border-color: var(--status-clarify-border);
 }
 
 .impact-list {
@@ -1706,6 +1708,34 @@ select {
   color: #edf4ff;
 }
 
+.status-action-grid button.status-accepted.active,
+.status-action-grid button.status-accepted:hover:not(:disabled) {
+  border-color: var(--status-accepted-border);
+  background: var(--status-accepted-bg);
+  color: var(--status-accepted-text);
+}
+
+.status-action-grid button.status-rejected.active,
+.status-action-grid button.status-rejected:hover:not(:disabled) {
+  border-color: var(--status-rejected-border);
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
+}
+
+.status-action-grid button.status-needs_clarification.active,
+.status-action-grid button.status-needs_clarification:hover:not(:disabled) {
+  border-color: var(--status-clarify-border);
+  background: var(--status-clarify-bg);
+  color: var(--status-clarify-text);
+}
+
+.status-action-grid button.status-pending.active,
+.status-action-grid button.status-pending:hover:not(:disabled) {
+  border-color: var(--status-pending-border);
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+}
+
 .statement-reference-button {
   justify-content: flex-start;
   min-height: auto;
@@ -1737,9 +1767,9 @@ select {
   justify-content: flex-start;
   width: 100%;
   min-height: 1.75rem;
-  border-color: rgba(91, 143, 231, 0.18);
-  background: rgba(91, 143, 231, 0.08);
-  color: #dbe8ff;
+  border-color: color-mix(in srgb, var(--kind) 45%, transparent);
+  background: color-mix(in srgb, var(--kind) 16%, transparent);
+  color: color-mix(in srgb, var(--kind) 24%, white);
   padding: 0 0.48rem;
   text-align: left;
   font-size: 0.74rem;
@@ -2323,9 +2353,9 @@ select {
 
 /* Dock primary action */
 .dock-actions .dock-primary {
-  border-color: rgba(111, 199, 166, 0.55);
-  background: rgba(111, 199, 166, 0.14);
-  color: #aef0d2;
+  border-color: var(--status-accepted-border);
+  background: var(--status-accepted-bg);
+  color: var(--status-accepted-text);
 }
 
 .dock-actions .dock-primary:hover:not(:disabled) {

@@ -246,6 +246,11 @@ function EntityPicker({
       <select
         aria-label="Entity"
         className="inline-chip-select entity"
+        data-kind={
+          value.mode === "existing"
+            ? (draft.entities.find((entity) => entity.id === value.id)?.entity_type ?? "class")
+            : value.entityType
+        }
         onChange={(event) => {
           const nextValue = event.target.value;
           onChange(

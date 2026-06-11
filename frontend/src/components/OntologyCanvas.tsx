@@ -149,6 +149,10 @@ export function OntologyCanvas({
     () => new Map(draft?.entities.map((entity) => [entity.id, entity.label]) ?? []),
     [draft],
   );
+  const entityKinds = useMemo(
+    () => new Map(draft?.entities.map((entity) => [entity.id, entity.entity_type]) ?? []),
+    [draft],
+  );
   const pendingCount =
     session?.statements.filter((review) => review.status === "pending").length ?? 0;
   const blockingStatuses = new Set(["pending", "needs_clarification"]);
@@ -411,6 +415,7 @@ export function OntologyCanvas({
                         <span className="statement">
                           {renderStatementParts(statement, draft).map((part, index) =>
                             renderStatementPart({
+                              entityKinds,
                               entityLabels,
                               index,
                               onSelectEntity,
@@ -867,6 +872,7 @@ function mentionEntityOptions(entities: Entity[], query: string) {
 }
 
 function renderStatementPart({
+  entityKinds,
   entityLabels,
   index,
   onSelectEntity,
@@ -875,6 +881,7 @@ function renderStatementPart({
   selectedEntityId,
   statement,
 }: {
+  entityKinds: Map<string, string>;
   entityLabels: Map<string, string>;
   index: number;
   onSelectEntity: (entityId: string) => void;
@@ -904,6 +911,7 @@ function renderStatementPart({
         "chip entity entity-chip",
         selectedEntityId === part.entityId ? "selected-entity" : "",
       ].join(" ")}
+      data-kind={entityKinds.get(part.entityId) ?? "class"}
       key={key}
       onClick={(event) => {
         event.stopPropagation();

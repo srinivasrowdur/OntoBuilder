@@ -1,4 +1,5 @@
 import type { GraphEdge, GraphNode, InternalGraphPosition } from "reagraph";
+import { entityKindColor } from "./designTokens";
 import type { Entity, OntologyDraft, Relationship } from "./types";
 
 export interface OntologyGraphData {
@@ -147,25 +148,7 @@ function relationshipMeta(relationship: Relationship) {
 }
 
 export function entityFill(entityType: string) {
-  switch (entityType) {
-    case "role":
-      return "#3a93a3";
-    case "document":
-      return "#7b7dd4";
-    case "event":
-      return "#9a7d3a";
-    case "process":
-      return "#4a9a72";
-    case "state":
-      return "#9a6489";
-    case "attribute":
-    case "value":
-      return "#948043";
-    case "external_reference":
-      return "#6e8296";
-    default:
-      return "#3568a0";
-  }
+  return entityKindColor(entityType);
 }
 
 export function entityTypeLabel(entityType: string) {

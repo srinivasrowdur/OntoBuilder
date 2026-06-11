@@ -146,7 +146,10 @@ export function StatementInspector({
         <div className="status-action-grid">
           {STATEMENT_STATUS_ACTIONS.map((action) => (
             <button
-              className={review.status === action.status ? "active" : ""}
+              className={[
+                `status-${action.status}`,
+                review.status === action.status ? "active" : "",
+              ].join(" ")}
               disabled={savingAction !== null || (!textChanged && review.status === action.status)}
               key={action.status}
               onClick={() => void applyStatement(action.status)}
