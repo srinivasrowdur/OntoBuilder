@@ -513,6 +513,7 @@ export function App() {
         onProjectCreate={createWorkspaceProject}
         onProjectOpen={openWorkspaceProject}
         onProjectSave={saveCurrentOntologyToProject}
+        onReviewStatement={updateStatementReview}
         onSelectEntity={selectEntity}
         onSelectStatement={selectStatement}
         prompt={prompt}

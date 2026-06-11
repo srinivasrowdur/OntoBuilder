@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getReadinessReport } from "./ontology";
+import { getReadinessReport, stepStatementId } from "./ontology";
 import type { DraftReviewSession, OntologyDraft, ReviewStatus, StatementReview } from "./types";
 
 const draft: OntologyDraft = {
@@ -71,5 +71,26 @@ describe("getReadinessReport", () => {
     expect(report.stage).toBe("export");
     expect(report.readiness).toBe(100);
     expect(report.committableCount).toBe(2);
+  });
+});
+
+describe("stepStatementId", () => {
+  const ids = ["s1", "s2", "s3"];
+
+  it("steps forward and backward", () => {
+    expect(stepStatementId(ids, "s1", 1)).toBe("s2");
+    expect(stepStatementId(ids, "s2", -1)).toBe("s1");
+  });
+
+  it("clamps at the ends", () => {
+    expect(stepStatementId(ids, "s3", 1)).toBe("s3");
+    expect(stepStatementId(ids, "s1", -1)).toBe("s1");
+  });
+
+  it("enters the list when nothing is selected or selection left the list", () => {
+    expect(stepStatementId(ids, null, 1)).toBe("s1");
+    expect(stepStatementId(ids, null, -1)).toBe("s3");
+    expect(stepStatementId(ids, "gone", 1)).toBe("s1");
+    expect(stepStatementId([], "s1", 1)).toBeNull();
   });
 });

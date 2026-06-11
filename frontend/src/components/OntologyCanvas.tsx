@@ -20,6 +20,7 @@ import {
   ruleById,
   ruleValuePhrase,
   statementStatus,
+  stepStatementId,
 } from "../ontology";
 import type {
   DraftReviewSession,
@@ -29,6 +30,7 @@ import type {
   NaturalLanguageStatement,
   OntologyDraft,
   ProjectSummary,
+  ReviewStatus,
   StatementCreatePayload,
 } from "../types";
 import { escapeRegExp } from "../utils/text";
@@ -66,6 +68,7 @@ interface OntologyCanvasProps {
   onProjectCreate: (name: string, description?: string) => Promise<void>;
   onProjectOpen: (projectId: string) => Promise<void>;
   onProjectSave: () => Promise<void>;
+  onReviewStatement: (statementId: string, status: ReviewStatus) => Promise<void> | void;
   onSelectEntity: (entityId: string) => void;
   onSelectStatement: (statementId: string) => void;
 }
@@ -124,6 +127,7 @@ export function OntologyCanvas({
   onProjectCreate,
   onProjectOpen,
   onProjectSave,
+  onReviewStatement,
   onSelectEntity,
   prompt,
   projectMessage,
@@ -158,6 +162,17 @@ export function OntologyCanvas({
   const blockingStatuses = new Set(["pending", "needs_clarification"]);
   const showWorklist = worklistOpen && readinessReport.blockingCount > 0;
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const visibleStatements = useMemo(() => {
+    const statements = draft?.statements ?? [];
+    if (!showWorklist) {
+      return statements;
+    }
+    return statements.filter((statement) =>
+      blockingStatuses.has(statementStatus(session, statement)),
+    );
+    // blockingStatuses is a render-stable constant set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, session, showWorklist]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: globalThis.KeyboardEvent) {
@@ -169,6 +184,90 @@ export function OntologyCanvas({
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
+
+  // Keyboard navigation outruns React's re-render on key repeat, so the
+  // handler reads and writes the live selection through a ref instead of
+  // closing over the prop.
+  const selectedStatementRef = useRef(selectedStatementId);
+
+  useEffect(() => {
+    selectedStatementRef.current = selectedStatementId;
+  }, [selectedStatementId]);
+
+  useEffect(() => {
+    const decisionByKey: Record<string, ReviewStatus> = {
+      a: "accepted",
+      r: "rejected",
+      c: "needs_clarification",
+      p: "pending",
+    };
+
+    function isTypingTarget(target: EventTarget | null) {
+      return (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      );
+    }
+
+    function handleTriageKeyDown(event: globalThis.KeyboardEvent) {
+      if (!session || paletteOpen || isProjectDrawerOpen || isComposerOpen) {
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      const statementIds = visibleStatements.map((statement) => statement.id);
+      const currentId = selectedStatementRef.current;
+
+      if (key === "j" || key === "arrowdown" || key === "k" || key === "arrowup") {
+        const delta = key === "j" || key === "arrowdown" ? 1 : -1;
+        const nextId = stepStatementId(statementIds, currentId, delta);
+        if (nextId) {
+          event.preventDefault();
+          selectedStatementRef.current = nextId;
+          onSelectStatement(nextId);
+        }
+        return;
+      }
+
+      const decision = decisionByKey[key];
+      if (decision && currentId && statementIds.includes(currentId)) {
+        event.preventDefault();
+        // Compute the auto-advance target before the decision removes the
+        // row from a filtered worklist.
+        const nextId = stepStatementId(statementIds, currentId, 1);
+        void onReviewStatement(currentId, decision);
+        if (nextId && nextId !== currentId) {
+          selectedStatementRef.current = nextId;
+          onSelectStatement(nextId);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleTriageKeyDown);
+    return () => window.removeEventListener("keydown", handleTriageKeyDown);
+  }, [
+    isComposerOpen,
+    isProjectDrawerOpen,
+    onReviewStatement,
+    onSelectStatement,
+    paletteOpen,
+    session,
+    visibleStatements,
+  ]);
+
+  useEffect(() => {
+    if (canvasView !== "statements") {
+      return;
+    }
+    document
+      .querySelector(".statement-row.selected")
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [canvasView, selectedStatementId]);
 
   const paletteCommands = useMemo<PaletteCommand[]>(() => {
     const commands: PaletteCommand[] = [
@@ -428,6 +527,10 @@ export function OntologyCanvas({
               </span>
             ))}
           </div>
+          <span aria-hidden className="keyboard-hint">
+            <kbd>j</kbd>
+            <kbd>k</kbd> navigate · <kbd>a</kbd> accept · <kbd>r</kbd> reject · <kbd>c</kbd> clarify
+          </span>
           {readinessReport.blockingCount > 0 ? (
             <button
               className={`readiness-worklist-toggle${showWorklist ? " active" : ""}`}
@@ -515,51 +618,46 @@ export function OntologyCanvas({
                   </div>
                 ) : null}
 
-                {draft.statements
-                  .filter(
-                    (statement) =>
-                      !showWorklist || blockingStatuses.has(statementStatus(session, statement)),
-                  )
-                  .map((statement) => (
-                    <div
-                      className={[
-                        "statement-row",
-                        `statement-${statement.kind}`,
-                        selectedStatementId === statement.id ? "selected" : "",
-                        statementStatus(session, statement),
-                      ].join(" ")}
-                      key={statement.id}
-                      onClick={() => onSelectStatement(statement.id)}
-                    >
-                      <span className="statement-status" aria-hidden="true" />
-                      <span className="statement-body">
-                        <span className={`statement-kind ${statement.kind}`}>
-                          {statement.kind === "rule" ? "Rule" : "Relationship"}
-                        </span>
-                        <span className="statement">
-                          {renderStatementParts(statement, draft).map((part, index) =>
-                            renderStatementPart({
-                              entityKinds,
-                              entityLabels,
-                              index,
-                              onSelectEntity,
-                              onSelectStatement,
-                              part,
-                              selectedEntityId,
-                              statement,
-                            }),
-                          )}
-                        </span>
-                        {showWorklist ? (
-                          <span className="worklist-reason">
-                            {statementStatus(session, statement) === "needs_clarification"
-                              ? "marked for clarification"
-                              : "awaiting review"}
-                          </span>
-                        ) : null}
+                {visibleStatements.map((statement) => (
+                  <div
+                    className={[
+                      "statement-row",
+                      `statement-${statement.kind}`,
+                      selectedStatementId === statement.id ? "selected" : "",
+                      statementStatus(session, statement),
+                    ].join(" ")}
+                    key={statement.id}
+                    onClick={() => onSelectStatement(statement.id)}
+                  >
+                    <span className="statement-status" aria-hidden="true" />
+                    <span className="statement-body">
+                      <span className={`statement-kind ${statement.kind}`}>
+                        {statement.kind === "rule" ? "Rule" : "Relationship"}
                       </span>
-                    </div>
-                  ))}
+                      <span className="statement">
+                        {renderStatementParts(statement, draft).map((part, index) =>
+                          renderStatementPart({
+                            entityKinds,
+                            entityLabels,
+                            index,
+                            onSelectEntity,
+                            onSelectStatement,
+                            part,
+                            selectedEntityId,
+                            statement,
+                          }),
+                        )}
+                      </span>
+                      {showWorklist ? (
+                        <span className="worklist-reason">
+                          {statementStatus(session, statement) === "needs_clarification"
+                            ? "marked for clarification"
+                            : "awaiting review"}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                ))}
               </div>
             ) : (
               <RelationshipGraph

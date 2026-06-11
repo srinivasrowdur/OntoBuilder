@@ -129,6 +129,22 @@ export function ruleValuePhrase(rule: Rule): string | null {
   return String(rule.value);
 }
 
+export function stepStatementId(
+  statementIds: string[],
+  currentId: string | null,
+  delta: 1 | -1,
+): string | null {
+  if (statementIds.length === 0) {
+    return null;
+  }
+  const currentIndex = currentId ? statementIds.indexOf(currentId) : -1;
+  if (currentIndex === -1) {
+    return delta === 1 ? statementIds[0] : statementIds[statementIds.length - 1];
+  }
+  const nextIndex = Math.min(Math.max(currentIndex + delta, 0), statementIds.length - 1);
+  return statementIds[nextIndex];
+}
+
 export function statementStatus(
   session: DraftReviewSession | null,
   statement: NaturalLanguageStatement,
